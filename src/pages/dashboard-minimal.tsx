@@ -1,0 +1,561 @@
+import { TrendingUp, Users, Target, Activity, BarChart3 } from "lucide-react";
+import AppHeader from "@/components/AppHeader";
+import HamburgerMenu from "@/components/HamburgerMenu";
+import ChartRenderer from "@/components/charts/ChartRenderer";
+import ChartDrillDownModal from "@/components/modals/ChartDrillDownModal";
+import MetricsDrillDownModal from "@/components/modals/MetricsDrillDownModal";
+import { useState, useEffect } from "react";
+import { DashboardSchema } from "@/schemas/dashboardSchema";
+import html2canvas from "html2canvas";
+import { useAppContext } from "@/contexts/AppContext";
+
+export default function DashboardMinimal() {
+  const { state, loadDashboardData, loadWordCloudData } = useAppContext();
+  
+  // Chart drill-down modal state
+  const [drillDownModal, setDrillDownModal] = useState({
+    isOpen: false,
+    dataPoint: null,
+    chartType: '',
+    chartTitle: ''
+  });
+
+  // Metrics drill-down modal state
+  const [metricsDrillDownModal, setMetricsDrillDownModal] = useState({
+    isOpen: false,
+    metricType: '',
+    metricTitle: '',
+    metricValue: ''
+  });  
+  // Use only authentic dashboard data from OpenAI assistant
+  // Validate and normalize data structure using Zod schema
+  const rawData: any = state.dashboardData;
+  let dashboardData: any;
+  let schemaError = null;
+
+  // Default fallback structure to prevent null reference errors
+  const defaultData = {
+    metrics: {
+      totalTranscripts: 0,
+      activeStations: 0,
+      topTopic: "Loading...",
+      topStation: "Loading...",
+      brandMentions: 0,
+      sentimentScore: 0,
+      growth: 0,
+      engagement: 0
+    },
+    charts: {}
+  };
+
+  // Create fallback data from raw data or use defaults
+  const createFallbackData = (sourceData: any = {}) => {
+    const metrics = sourceData?.metrics || sourceData?.dashboard_metrics || sourceData?.dashboard?.metrics || {};
+    return {
+      metrics: {
+        totalTranscripts: metrics.totalTranscripts || metrics.total_transcripts || 0,
+        activeStations: metrics.activeStations || metrics.active_stations || 0,
+        topTopic: metrics.topTopic || metrics.top_topic || "Loading...",
+        topStation: metrics.topStation || metrics.top_station || "Loading...",
+        brandMentions: metrics.brandMentions || metrics.brand_mentions || 0,
+        sentimentScore: metrics.sentimentScore || metrics.sentiment_score || 0,
+        growth: metrics.growth || 0,
+        engagement: metrics.engagement || 0
+      },
+      charts: sourceData?.charts || sourceData?.dashboard?.charts || {}
+    };
+  };
+
+  try {
+    const parsedData = DashboardSchema.parse(rawData);
+    dashboardData = parsedData || createFallbackData(rawData);
+  } catch (err: any) {
+    schemaError = err;
+    dashboardData = createFallbackData(rawData);
+  }
+
+  // Final safety check to ensure dashboardData is never null/undefined
+  if (!dashboardData || typeof dashboardData !== 'object') {
+    dashboardData = defaultData;
+  }
+
+  // Ensure metrics and charts properties exist
+  if (!dashboardData.metrics) {
+    dashboardData.metrics = defaultData.metrics;
+  }
+  if (!dashboardData.charts) {
+    dashboardData.charts = {};
+  }
+  // Check if we have actual chart data (not just fallback)
+  const hasRealChartData = dashboardData.charts && Object.keys(dashboardData.charts).length > 0;
+  const isDashboardLoading = state.isDashboardLoading;
+
+  // Load dashboard data and word cloud only once on component mount
+  useEffect(() => {
+    // Always load fresh dashboard data to get authentic radio metrics
+    loadDashboardData(true);
+    
+    // Load word cloud data if we don't have it
+    if (!state.wordCloudData) {
+      loadWordCloudData(true);
+    }
+  }, []);
+
+  // Handle chart click for drill-down analysis
+  const handleChartClick = (dataPoint: any, chartType: string, chartTitle: string) => {
+    console.log('Dashboard handleChartClick called with:', { dataPoint, chartType, chartTitle });
+    
+    // Use setTimeout to ensure DOM elements are ready before opening modal
+    setTimeout(() => {
+      try {
+        setDrillDownModal({
+          isOpen: true,
+          dataPoint,
+          chartType,
+          chartTitle
+        });
+      } catch (error) {
+        console.error('Error in handleChartClick:', error);
+      }
+    }, 50); // Small delay to let DOM settle
+  };
+
+  // API call to analyze chart drill-down
+  const analyzeChartDrillDown = async (dataPoint: any, chartType: string, chartTitle: string) => {
+    try {
+      const response = await fetch("/api/chart-drill-down", {
+        method: "POST",
+        body: JSON.stringify({
+          dataPoint,
+          chartType,
+          chartTitle,
+          originalData: dashboardData
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Failed to analyze chart drill-down:", error);
+      throw error;
+    }
+  }; // Empty dependency array ensures this runs only once
+
+  // Handle metric card click for drill-down analysis
+  const handleMetricClick = (metricType: string, metricTitle: string, metricValue: string) => {
+    console.log("Dashboard handleMetricClick called with:", { metricType, metricTitle, metricValue });
+    
+    setTimeout(() => {
+      try {
+        setMetricsDrillDownModal({
+          isOpen: true,
+          metricType,
+          metricTitle,
+          metricValue
+        });
+      } catch (error) {
+        console.error("Error in handleMetricClick:", error);
+      }
+    }, 50);
+  };
+
+  // Dynamic chart rendering function
+  const renderDynamicCharts = () => {
+    const chartsData = dashboardData.charts;
+    if (!chartsData || Object.keys(chartsData).length === 0) {
+      return (
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="p-4 sm:p-6 bg-card border border-border rounded-lg">
+            <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-sm sm:text-base">
+                  {isDashboardLoading ? 'AI generating dashboard insights...' : 'Loading dashboard...'}
+                </p>
+                {isDashboardLoading && (
+                  <p className="text-xs text-muted-foreground mt-1">Analyzing data patterns and trends</p>
+                )}
+                {schemaError && (
+                  <p className="text-xs text-destructive mt-2">Schema validation error: {schemaError.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Get all available charts from AI response
+    const availableCharts = Object.entries(chartsData)
+      .filter(([key, chart]) => {
+        const c = chart as any;
+        return c && c.data && Array.isArray(c.data) && c.data.length > 0;
+      })
+      .map(([key, chart]) => ({ key, chart: chart as import("@/schemas/dashboardSchema").ChartData }));
+
+    if (availableCharts.length === 0) {
+      return (
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="p-4 sm:p-6 bg-card border border-border rounded-lg">
+            <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-sm sm:text-base">Processing AI insights...</p>
+                <p className="text-xs text-muted-foreground mt-1">Generating visualizations</p>
+                {schemaError && (
+                  <p className="text-xs text-destructive mt-2">Schema validation error: {schemaError.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Determine optimal grid layout based on number of charts
+    const getGridLayout = (count: number) => {
+      if (count === 1) return "grid-cols-1";
+      if (count === 2) return "grid-cols-1 lg:grid-cols-2";
+      if (count === 3) return "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
+      return "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
+    };
+
+    return (
+      <div className={`grid ${getGridLayout(availableCharts.length)} gap-6 sm:gap-8 mb-8 sm:mb-12`}>
+        {availableCharts.map(({ key, chart }) => (
+          <div key={key} className="p-2 sm:p-3 bg-card border border-border rounded-xl flex flex-col w-full max-w-[700px] mx-auto shadow-lg">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
+              <h3 className="text-lg sm:text-2xl font-semibold text-foreground">
+                {chart.title || formatChartTitle(key)}
+              </h3>
+              <div className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                {chart.type?.toUpperCase() || 'AUTO'}
+              </div>
+            </div>
+            <div className="h-auto min-h-[400px] flex-shrink-0 mb-4 w-full flex items-center justify-center">
+              <ChartRenderer chartData={chart} onChartClick={handleChartClick} />
+            </div>
+            <div className="flex-grow space-y-2 mt-4">
+              {chart.insights && (
+                <div className="p-2 bg-muted/30 rounded-lg mt-4">
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    <span className="font-medium">AI Insight:</span> {chart.insights}
+                  </p>
+                </div>
+              )}
+              {chart.caption && (
+                <div>
+                  <p className="text-sm text-muted-foreground">{chart.caption}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Helper function to format chart titles from keys
+  const formatChartTitle = (key: string) => {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const downloadDashboard = async () => {
+    try {
+      const element = document.querySelector('.dashboard-content') as HTMLElement;
+      if (!element) return;
+      
+      const canvas = await html2canvas(element, {
+        backgroundColor: 'transparent',
+        scale: 2,
+        useCORS: true,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `dashboard-${Date.now()}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    } catch (error) {
+      console.error('Dashboard download failed:', error);
+    }
+  };
+
+  const shareDashboard = async () => {
+    try {
+      const metrics = dashboardData.metrics as any;
+      const summary = `AZI Radio Analytics Dashboard Summary:
+- Radio Transcripts: ${(metrics.totalTranscripts || 0).toLocaleString()}
+- Active Stations: ${metrics.activeStations || 0}
+- Growth: ${metrics.growth || 0}% new content
+- Top Topic: ${metrics.topTopic || "Loading..."}
+- Top Station: ${metrics.topStation || "Loading..."}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: 'AnalysisGenius Dashboard',
+          text: summary,
+        });
+      } else {
+        navigator.clipboard.writeText(summary);
+        alert('Dashboard summary copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Dashboard share failed:', error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Hamburger Menu */}
+      <HamburgerMenu 
+        onDownloadChat={downloadDashboard}
+        onShareChat={shareDashboard}
+      />
+
+      {/* Consistent Header */}
+      <AppHeader />
+      
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 dashboard-content">
+
+        {/* Radio Analysis Metrics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Total Transcripts */}
+          <div 
+            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => handleMetricClick('totalTranscripts', 'Total Transcripts', (dashboardData.metrics.totalTranscripts || 0).toString())}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-label mb-1 sm:mb-2">Radio Transcripts</p>
+                <p className="text-lg sm:text-2xl font-bold text-metric truncate">
+                  {(dashboardData.metrics.totalTranscripts || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-description">
+                  ↗ {dashboardData.metrics.growth}% new content
+                </p>
+              </div>
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-full flex-shrink-0">
+                <BarChart3 className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Stations */}
+          <div 
+            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => handleMetricClick('activeStations', 'Active Stations', (dashboardData.metrics.activeStations || 0).toString())}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-label mb-1 sm:mb-2">Active Stations</p>
+                <p className="text-lg sm:text-2xl font-bold text-metric">
+                  {dashboardData.metrics.activeStations || 0}
+                </p>
+                <p className="text-xs text-description">
+                  ↗ {dashboardData.metrics.engagement}% engagement rate
+                </p>
+              </div>
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-full flex-shrink-0">
+                <Users className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          {/* Top Topic */}
+          <div 
+            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => handleMetricClick('topTopic', 'Top Topic', dashboardData.metrics.topTopic || 'Loading...')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-label mb-1 sm:mb-2">Top Analysis Topic</p>
+                <p className="text-sm sm:text-lg font-bold text-metric truncate">
+                  {dashboardData.metrics.topTopic}
+                </p>
+                <p className="text-xs text-description">Most analyzed topic</p>
+              </div>
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-full flex-shrink-0">
+                <Target className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          {/* Top Station */}
+          <div 
+            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => handleMetricClick('topStation', 'Top Station', dashboardData.metrics.topStation || 'Loading...')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-label mb-1 sm:mb-2">Top Radio Station</p>
+                <p className="text-sm sm:text-lg font-bold text-metric truncate">
+                  {dashboardData.metrics.topStation || "Loading..."}
+                </p>
+                <p className="text-xs text-description">Highest engagement</p>
+              </div>
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-full flex-shrink-0">
+                <Activity className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        {/* Dynamic Charts Section */}
+        {renderDynamicCharts()}
+
+        {/* Dynamic Word Cloud Section */}
+        <div className="mb-6 sm:mb-8">
+          <div className="p-4 sm:p-6 bg-card border border-border rounded-lg">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground">
+                Popular Topics Word Cloud
+              </h3>
+              <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                WORDCLOUD
+              </div>
+            </div>
+            
+            <div className="word-cloud-container h-64 p-4 border rounded-lg bg-muted/20">
+              {state.isWordCloudLoading ? (
+                // Loading skeleton
+                <div className="flex justify-center items-center h-full">
+                  <div className="animate-pulse text-center">
+                    <div className="w-12 h-12 bg-muted rounded-lg mx-auto mb-2"></div>
+                    <div className="text-sm text-muted-foreground">Loading word cloud data...</div>
+                  </div>
+                </div>
+              ) : state.wordCloudData?.wordData ? (
+                // Real word cloud data from OpenAI assistant
+                <div className="flex flex-wrap gap-2 justify-center items-center h-full overflow-y-auto">
+                  {state.wordCloudData.wordData.map((word: any, index: number) => {
+                    const maxValue = Math.max(...state.wordCloudData.wordData.map((w: any) => w.value));
+                    const minValue = Math.min(...state.wordCloudData.wordData.map((w: any) => w.value));
+                    const size = Math.max(12, Math.min(32, (word.value / maxValue) * 24 + 8));
+                    const opacity = Math.max(0.6, word.value / maxValue);
+                    
+                    // Dynamic color based on frequency value with gradient spectrum
+                    const getColorByFrequency = (value: number, max: number, min: number) => {
+                      const normalized = (value - min) / (max - min);
+                      
+                      // High frequency (red spectrum) - top 20%
+                      if (normalized >= 0.8) {
+                        const intensity = (normalized - 0.8) / 0.2;
+                        return `hsl(${350 + intensity * 10}, ${85 + intensity * 15}%, ${45 + intensity * 15}%)`; // Deep red to bright red
+                      }
+                      // High-medium frequency (orange to red) - 60-80%
+                      else if (normalized >= 0.6) {
+                        const intensity = (normalized - 0.6) / 0.2;
+                        return `hsl(${15 + intensity * 25}, ${80 + intensity * 15}%, ${50 + intensity * 10}%)`; // Orange to red-orange
+                      }
+                      // Medium frequency (yellow to orange) - 40-60%
+                      else if (normalized >= 0.4) {
+                        const intensity = (normalized - 0.4) / 0.2;
+                        return `hsl(${45 + intensity * 15}, ${75 + intensity * 15}%, ${55 + intensity * 10}%)`; // Yellow to orange
+                      }
+                      // Low-medium frequency (green to yellow) - 20-40%
+                      else if (normalized >= 0.2) {
+                        const intensity = (normalized - 0.2) / 0.2;
+                        return `hsl(${90 + intensity * 45}, ${70 + intensity * 15}%, ${50 + intensity * 15}%)`; // Green to yellow-green
+                      }
+                      // Low frequency (blue to green) - 0-20%
+                      else {
+                        const intensity = normalized / 0.2;
+                        return `hsl(${210 + intensity * 60}, ${65 + intensity * 15}%, ${45 + intensity * 20}%)`; // Blue to blue-green
+                      }
+                    };
+                    
+                    return (
+                      <span
+                        key={index}
+                        className="word-cloud-word cursor-pointer inline-block m-1 p-2 rounded-md hover:bg-muted/40 relative transition-all duration-300"
+                        style={{ 
+                          fontSize: `${size}px`, 
+                          opacity: opacity,
+                          color: getColorByFrequency(word.value, maxValue, minValue),
+                          fontWeight: word.value > maxValue * 0.6 ? 'bold' : 'normal',
+                          animationDelay: `${index * 0.2}s`,
+                          textShadow: `0 0 ${Math.max(2, word.value / maxValue * 8)}px ${getColorByFrequency(word.value, maxValue, minValue)}40`,
+                          filter: `brightness(${0.9 + (word.value / maxValue) * 0.3})`
+                        }}
+                        onClick={() => {
+                          const dataPoint = {
+                            label: word.text,
+                            value: word.value,
+                            category: word.category,
+                            sentiment: word.sentiment,
+                            seriesIndex: 0,
+                            dataPointIndex: index
+                          };
+                          handleChartClick(dataPoint, 'wordcloud', 'Popular Topics Word Cloud');
+                        }}
+                      >
+                        {word.text}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Fallback if no data
+                <div className="flex justify-center items-center h-full">
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-sm">No word cloud data available</p>
+                    <p className="text-xs mt-1">Click refresh to load fresh data</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                <span className="font-medium">AI Insight:</span> {
+                  state.wordCloudData?.metadata?.analysisScope || 
+                  "Most frequently mentioned topics from radio transcript database, with word size indicating mention frequency."
+                }
+              </p>
+              {state.wordCloudData?.metadata && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Source: {state.wordCloudData.metadata.dataSource} | 
+                  Updated: {state.wordCloudData.metadata.lastUpdated} | 
+                  Total words: {state.wordCloudData.metadata.totalWords}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Chart Drill-Down Modal */}
+      {drillDownModal.isOpen && drillDownModal.dataPoint && (
+        <ChartDrillDownModal
+          isOpen={drillDownModal.isOpen}
+          onClose={() => setDrillDownModal(prev => ({ ...prev, isOpen: false }))}
+          dataPoint={drillDownModal.dataPoint}
+          chartType={drillDownModal.chartType}
+          chartTitle={drillDownModal.chartTitle}
+          onAnalyze={analyzeChartDrillDown}
+        />
+      )}
+
+      {/* Metrics Drill-Down Modal */}
+      <MetricsDrillDownModal
+        isOpen={metricsDrillDownModal.isOpen}
+        onClose={() => setMetricsDrillDownModal({ isOpen: false, metricType: "", metricTitle: "", metricValue: "" })}
+        metricType={metricsDrillDownModal.metricType}
+        metricTitle={metricsDrillDownModal.metricTitle}
+        metricValue={metricsDrillDownModal.metricValue}
+      />
+    </div>
+  );
+}
