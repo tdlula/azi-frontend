@@ -7,8 +7,8 @@ on:
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  IMAGE_NAME: azi-backend # Replace with your Docker image name (e.g., my-app)
-  CONTAINER_NAME: azi-backend-container # Replace with your desired container name
+  IMAGE_NAME: azi-frontend # Replace with your Docker image name (e.g., my-app)
+  CONTAINER_NAME: azi-frontend-container # Replace with your desired container name
   DOCKERFILE_PATH: ./Dockerfile # Path to your Dockerfile, adjust if needed
 
 jobs:
