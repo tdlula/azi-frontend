@@ -39,9 +39,7 @@ jobs:
           username: ${{ secrets.VM_USERNAME }} # SSH username for your VM
           key: ${{ secrets.SSH_PRIVATE_KEY }} # SSH private key for authentication
           script: |
-            # Navigate to a directory if necessary (optional)
-            # cd /path/to/your/app
-
+           
             echo "Pulling the latest Docker image..."
             docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
