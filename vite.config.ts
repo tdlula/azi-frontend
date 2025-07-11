@@ -13,7 +13,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        target: "http://azi-backend-container:5000",
+        target: "http://129.151.191.161:7000",
         changeOrigin: true,
       },
     },
