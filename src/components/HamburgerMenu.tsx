@@ -6,6 +6,7 @@ import { Menu, X, Download, Share2, Palette, Sun, Moon, Camera, FileDown, Link, 
 import { useTheme } from "@/components/ui/theme-provider";
 import { Link as RouterLink, useLocation } from "wouter";
 import html2canvas from "html2canvas";
+import ExportDropdown from "@/components/ui/export-dropdown";
 
 interface HamburgerMenuProps {
   onScreenshot?: () => void;
@@ -72,8 +73,30 @@ export default function HamburgerMenu({
     if (onCopyContent) onCopyContent();
   };
 
-  const handleExportData = () => {
-    // Export chat data as TXT (matching original functionality)
+  const handleExportData = async (format: 'txt' | 'pdf' | 'json' | 'png') => {
+    try {
+      switch (format) {
+        case 'txt':
+          await exportAsText();
+          break;
+        case 'pdf':
+          await exportAsPDF();
+          break;
+        case 'json':
+          await exportAsJSON();
+          break;
+        case 'png':
+          await handleScreenshot();
+          return; // Screenshot handles its own closing
+      }
+      setIsOpen(false);
+      if (onExportData) onExportData();
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const exportAsText = async () => {
     const chatContent = document.querySelector('.chat-area')?.textContent || '';
     const chatLines = chatContent.split('\n').filter(line => line.trim());
     const formattedContent = chatLines.join('\n\n');
@@ -82,12 +105,65 @@ export default function HamburgerMenu({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `chat-history-${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `azi-export-${new Date().toISOString().split('T')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportAsJSON = async () => {
+    const data = {
+      exportDate: new Date().toISOString(),
+      platform: "Azi Analytics Platform",
+      chatHistory: Array.from(document.querySelectorAll('.chat-message') || []).map((msg, index) => ({
+        id: index,
+        content: msg.textContent,
+        timestamp: new Date().toISOString()
+      })),
+      pageInfo: {
+        url: window.location.href,
+        title: document.title,
+        userAgent: navigator.userAgent
+      }
+    };
     
-    setIsOpen(false);
-    if (onExportData) onExportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `azi-export-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsPDF = async () => {
+    try {
+      const chatMessages = Array.from(document.querySelectorAll('.chat-message') || []);
+      const exportData = {
+        title: "Azi Analytics Export",
+        content: chatMessages.map(msg => msg.textContent).join('\n\n'),
+        timestamp: new Date().toISOString(),
+        pageUrl: window.location.href
+      };
+
+      const response = await fetch('/api/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exportData),
+      });
+
+      if (!response.ok) throw new Error('PDF generation failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `azi-export-${new Date().toISOString().split('T')[0]}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      await exportAsText(); // Fallback to text
+    }
   };
 
   const toggleTheme = () => {
@@ -98,7 +174,7 @@ export default function HamburgerMenu({
   return (
     <>
       {/* Hamburger Button */}
-      <div className="fixed top-4 left-4 z-50">
+      <div className="fixed top-20 left-4 z-50">
         <Button
           onClick={toggleMenu}
           variant="outline"
@@ -203,17 +279,12 @@ export default function HamburgerMenu({
                 Export & Download
               </h3>
               <div className="space-y-3">
-                <Button
-                  onClick={() => {
-                    if (onDownloadChat) onDownloadChat();
-                    setIsOpen(false);
-                  }}
+                <ExportDropdown
+                  onExport={handleExportData}
+                  className="w-full"
                   variant="outline"
-                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
-                >
-                  <Download className="h-4 w-4 mr-2 text-muted-foreground" />
-                  Download Chat History
-                </Button>
+                  title="Export Data"
+                />
 
                 <Button
                   onClick={handleScreenshot}
@@ -222,15 +293,6 @@ export default function HamburgerMenu({
                 >
                   <Camera className="h-4 w-4 mr-2 text-muted-foreground" />
                   Screenshot Page
-                </Button>
-                
-                <Button
-                  onClick={handleExportData}
-                  variant="outline"
-                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
-                >
-                  <FileDown className="h-4 w-4 mr-2 text-muted-foreground" />
-                  Export as JSON
                 </Button>
               </div>
             </div>

@@ -19,6 +19,7 @@ import {
   X,
   Download
 } from "lucide-react";
+import ExportDropdown from "@/components/ui/export-dropdown";
 
 interface MetricsDrillDownModalProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ export default function MetricsDrillDownModal({
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -98,35 +100,157 @@ export default function MetricsDrillDownModal({
     }
   };
 
-  const exportAnalysis = async () => {
-    if (!analysis) return;
-    
+  const handleExport = async (format: 'txt' | 'pdf' | 'json' | 'png') => {
+    if (!analysis || !hasAnalyzed) {
+      alert("Please wait for the analysis to complete before exporting");
+      return;
+    }
+
+    setIsExporting(true);
     try {
-      const exportData = {
+      switch (format) {
+        case 'txt':
+          await exportAsText();
+          break;
+        case 'pdf':
+          await exportAsPDF();
+          break;
+        case 'json':
+          await exportAsJSON();
+          break;
+        case 'png':
+          await exportAsImage();
+          break;
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert(`Failed to export as ${format.toUpperCase()}. Please try again.`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportAsText = async () => {
+    const textContent = `${metricTitle} Analysis Report
+${'='.repeat(metricTitle.length + 17)}
+
+Metric: ${metricTitle}
+Type: ${metricType}
+Value: ${metricValue}
+Generated: ${new Date().toLocaleString()}
+
+Analysis Summary:
+${analysis?.summary || 'No summary available'}
+
+Key Insights:
+${analysis?.breakdown?.keyInsights?.map((insight: any, index: number) => 
+  `${index + 1}. ${typeof insight === 'string' ? insight : insight.text || 'N/A'}`
+).join('\n') || 'No insights available'}
+
+Contributing Components:
+${analysis?.breakdown?.components?.map((comp: any, index: number) => 
+  `${index + 1}. ${typeof comp === 'string' ? comp : comp.name || comp.text || 'N/A'}`
+).join('\n') || 'No components available'}
+
+Recommendations:
+${analysis?.recommendations?.map((rec: any, index: number) => 
+  `${index + 1}. ${typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}`
+).join('\n') || 'No recommendations available'}
+
+Radio Transcript Extracts:
+${analysis?.radioExtracts?.map((extract: any, index: number) => 
+  `${index + 1}. ${extract.quote || extract.text || 'N/A'}${extract.station ? ` - ${extract.station}` : ''}${extract.timestamp ? ` (${extract.timestamp})` : ''}`
+).join('\n') || 'No extracts available'}`;
+
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Metric_Analysis_${metricTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsJSON = async () => {
+    const jsonData = {
+      exportDate: new Date().toISOString(),
+      metricAnalysis: {
         metricTitle,
         metricType,
         metricValue,
         analysis,
-        timestamp: new Date().toISOString(),
-        reportTitle: `${metricTitle} Analysis Report`
-      };
+        metadata: {
+          exportFormat: 'json',
+          source: 'Azi Analytics Platform',
+          userAgent: navigator.userAgent
+        }
+      }
+    };
 
-      // For now, just download as JSON
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Metric_Analysis_${metricTitle}_${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Export failed:', error);
-    }
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Metric_Analysis_${metricTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsPDF = async () => {
+    const exportData = {
+      chartTitle: `${metricTitle} Analysis`,
+      chartType: 'metrics',
+      dataPoint: {
+        label: metricTitle,
+        value: metricValue
+      },
+      analysis: {
+        summary: analysis?.summary || '',
+        breakdown: analysis?.breakdown || {},
+        recommendations: analysis?.recommendations || []
+      },
+      timestamp: new Date().toISOString(),
+      reportTitle: `${metricTitle} Analysis Report`
+    };
+
+    const response = await fetch('/api/export-chart-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(exportData),
+    });
+
+    if (!response.ok) throw new Error('Failed to generate PDF');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Metric_Analysis_${metricTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportAsImage = async () => {
+    const modal = document.querySelector('[data-testid="metrics-modal"]');
+    if (!modal) return;
+
+    // Dynamic import to reduce bundle size
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(modal as HTMLElement, {
+      backgroundColor: 'white',
+      scale: 2,
+      useCORS: true,
+    });
+
+    const link = document.createElement('a');
+    link.download = `Metric_Analysis_${metricTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="metrics-modal">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -138,15 +262,15 @@ export default function MetricsDrillDownModal({
               </DialogDescription>
             </div>
             {analysis && hasAnalyzed && (
-              <Button
+              <ExportDropdown
+                onExport={handleExport}
+                disabled={isExporting}
+                loading={isExporting}
+                className="gap-2"
                 variant="outline"
                 size="sm"
-                onClick={exportAnalysis}
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
+                title={isExporting ? 'Exporting...' : 'Export'}
+              />
             )}
           </div>
         </DialogHeader>

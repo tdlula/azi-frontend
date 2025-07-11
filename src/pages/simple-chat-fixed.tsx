@@ -43,8 +43,14 @@ import html2canvas from "html2canvas";
 import { Link } from "wouter";
 import { useAppContext } from "@/contexts/AppContext";
 
+// Generate unique IDs for messages to prevent React key warnings
+let messageIdCounter = 0;
+const generateUniqueId = () => {
+  return `${Date.now()}-${++messageIdCounter}`;
+};
+
 interface Message {
-  id: number;
+  id: string;
   content: string;
   role: "user" | "assistant";
   timestamp: Date;
@@ -121,7 +127,7 @@ export default function SimpleChatFixedPage() {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
-      id: Date.now(),
+      id: generateUniqueId(),
       content: input,
       role: "user",
       timestamp: new Date(),
@@ -132,12 +138,12 @@ export default function SimpleChatFixedPage() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      // Check for chart generation requests
+      // Check for chart generation requests - only explicit visual requests
       const chartKeywords = [
-        'chart', 'graph', 'plot', 'visual', 'visualization', 'generate', 'create', 'show', 'display',
-        'bar chart', 'line chart', 'pie chart', 'area chart', 'scatter', 'trending', 'trends',
-        'breakdown', 'distribution', 'comparison', 'over time', 'statistics', 'data', 'metrics',
-        'top', 'most', 'highest', 'lowest', 'analysis', 'analyze', 'visualize'
+        'chart', 'graph', 'plot', 'visual', 'visualization', 'visualize',
+        'bar chart', 'line chart', 'pie chart', 'area chart', 'scatter plot', 
+        'create chart', 'generate chart', 'show chart', 'display chart',
+        'trending chart', 'trends chart', 'distribution chart', 'comparison chart'
       ];
       const hasChartKeywords = chartKeywords.some(keyword => 
         input.toLowerCase().includes(keyword)
@@ -162,7 +168,7 @@ export default function SimpleChatFixedPage() {
         if (chartResponse.ok) {
           const chartData = await chartResponse.json();
           const aiMessage: Message = {
-            id: Date.now() + 1,
+            id: generateUniqueId(),
             content: chartData.message || "Here's your requested chart:",
             role: "assistant",
             timestamp: new Date(),
@@ -206,7 +212,7 @@ export default function SimpleChatFixedPage() {
           
           if (format === "table") {
             const aiMessage: Message = {
-              id: Date.now() + 1,
+              id: generateUniqueId(),
               content: sentimentData.analysis || "Here's your sentiment analysis:",
               role: "assistant",
               timestamp: new Date(),
@@ -215,7 +221,7 @@ export default function SimpleChatFixedPage() {
             dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
           } else {
             const aiMessage: Message = {
-              id: Date.now() + 1,
+              id: generateUniqueId(),
               content: sentimentData.analysis || sentimentData.summary || "Analysis complete.",
               role: "assistant",
               timestamp: new Date(),
@@ -250,7 +256,7 @@ export default function SimpleChatFixedPage() {
         // Check if the response contains chart data
         if (data.chartData) {
           const aiMessage: Message = {
-            id: Date.now() + 1,
+            id: generateUniqueId(),
             content: data.message || "Here's a visualization based on your request:",
             role: "assistant",
             timestamp: new Date(),
@@ -259,7 +265,7 @@ export default function SimpleChatFixedPage() {
           dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
         } else {
           const aiMessage: Message = {
-            id: Date.now() + 1,
+            id: generateUniqueId(),
             content: data.message || data.response || "I'm here to help with your data analysis needs.",
             role: "assistant",
             timestamp: new Date(),
@@ -286,7 +292,7 @@ export default function SimpleChatFixedPage() {
       }
       
       const errorMessage: Message = {
-        id: Date.now() + 1,
+        id: generateUniqueId(),
         content: errorContent,
         role: "assistant",
         timestamp: new Date(),
@@ -310,7 +316,7 @@ export default function SimpleChatFixedPage() {
     // File validation
     if (fileSize > maxSize) {
       const errorMessage: Message = {
-        id: Date.now(),
+        id: generateUniqueId(),
         content: `File is too large. Please upload a ${isPDF ? 'PDF' : 'text'} file smaller than ${isPDF ? '50MB' : '10MB'}.`,
         role: "assistant",
         timestamp: new Date(),
@@ -323,7 +329,7 @@ export default function SimpleChatFixedPage() {
     setIsUploadProcessing(true);
 
     const uploadMessage: Message = {
-      id: Date.now(),
+      id: generateUniqueId(),
       content: `Analyzing ${fileName}...`,
       role: "assistant", 
       timestamp: new Date(),
@@ -332,9 +338,9 @@ export default function SimpleChatFixedPage() {
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('document', file);
 
-      const endpoint = isPDF ? '/api/upload-pdf' : '/api/upload-text';
+      const endpoint = isPDF ? '/api/upload-pdf' : '/api/upload-document';
       const uploadResponse = await fetch(endpoint, {
         method: 'POST',
         body: formData,
@@ -344,29 +350,47 @@ export default function SimpleChatFixedPage() {
         const data = await uploadResponse.json();
         
         const processingMessage: Message = {
-          id: Date.now() + 1,
+          id: generateUniqueId(),
           content: isPDF ? "PDF processed successfully! Analysis:" : "Document analyzed successfully! Here are the insights:",
           role: "assistant",
           timestamp: new Date(),
         };
         dispatch({ type: "ADD_MESSAGE", payload: processingMessage });
 
-        if (data.pdfAnalysis) {
-          // Handle PDF analysis response
-          const analysisMessage: Message = {
-            id: Date.now() + 2,
-            content: data.pdfAnalysis,
-            role: "assistant",
-            timestamp: new Date(),
-          };
-          dispatch({ type: "ADD_MESSAGE", payload: analysisMessage });
+        if (data.analysis) {
+          // Format analysis response properly
+          const analysis = data.analysis;
+          let formattedContent = "";
+          
+          if (analysis.summary) {
+            formattedContent += `**Summary:**\n${analysis.summary}\n\n`;
+          }
+          
+          if (analysis.keyInsights && Array.isArray(analysis.keyInsights)) {
+            formattedContent += `**Key Insights:**\n`;
+            analysis.keyInsights.forEach((insight: string, index: number) => {
+              formattedContent += `${index + 1}. ${insight}\n`;
+            });
+            formattedContent += `\n`;
+          }
+          
+          if (analysis.sentiment) {
+            formattedContent += `**Sentiment Analysis:**\n`;
+            formattedContent += `Overall: ${analysis.sentiment.overall}\n`;
+            formattedContent += `Score: ${analysis.sentiment.score}/10\n`;
+            formattedContent += `Confidence: ${Math.round(analysis.sentiment.confidence * 100)}%\n\n`;
+          }
+          
+          if (analysis.recommendations && Array.isArray(analysis.recommendations)) {
+            formattedContent += `**Recommendations:**\n`;
+            analysis.recommendations.forEach((rec: string, index: number) => {
+              formattedContent += `${index + 1}. ${rec}\n`;
+            });
+          }
 
-          // PDF processing complete - no chart visualization needed
-        } else if (data.analysis) {
-          // Handle text file analysis response
           const analysisMessage: Message = {
-            id: Date.now() + 1,
-            content: data.analysis,
+            id: generateUniqueId(),
+            content: formattedContent || "Analysis completed successfully.",
             role: "assistant",
             timestamp: new Date(),
           };
@@ -375,7 +399,7 @@ export default function SimpleChatFixedPage() {
 
         if (data.chartData) {
           const chartMessage: Message = {
-            id: Date.now() + 2,
+            id: generateUniqueId(),
             content: "Here's a visual representation of your document:",
             role: "assistant",
             timestamp: new Date(),
@@ -403,7 +427,7 @@ export default function SimpleChatFixedPage() {
       }
       
       const errorMessage: Message = {
-        id: Date.now() + 1,
+        id: generateUniqueId(),
         content: errorContent,
         role: "assistant",
         timestamp: new Date(),
@@ -483,13 +507,51 @@ export default function SimpleChatFixedPage() {
     }
   };
 
-  const copyMessage = async (message: string, id: number) => {
+  const copyMessage = async (message: string, id: number, event?: React.MouseEvent) => {
+    // Prevent event bubbling to parent chat bubble
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
     try {
+      console.log('Copy button clicked for message:', id); // Debug log
+      
+      // Check if clipboard is available
+      if (!navigator.clipboard) {
+        console.error('Clipboard API not available');
+        alert('Clipboard not supported in this browser. Please manually copy the text.');
+        return;
+      }
+
       await navigator.clipboard.writeText(message);
+      console.log('Message copied successfully'); // Debug log
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
+      
+      // Optional: Show a brief success message
+      // You can remove this if you prefer just the visual feedback
     } catch (error) {
       console.error('Error copying message:', error);
+      
+      // Fallback for browsers with restricted clipboard access
+      try {
+        // Create a temporary textarea for fallback copying
+        const textArea = document.createElement('textarea');
+        textArea.value = message;
+        document.body.appendChild(textArea);
+        textArea.select();
+        textArea.setSelectionRange(0, 99999); // For mobile devices
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+        console.log('Fallback copy successful');
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+        alert('Failed to copy message. Please manually select and copy the text.');
+      }
     }
   };
 
@@ -788,7 +850,7 @@ export default function SimpleChatFixedPage() {
                       message.role === "user"
                         ? "chat-bubble-user"
                         : "chat-bubble-bot"
-                    } micro-bounce`}
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0">
@@ -812,10 +874,9 @@ export default function SimpleChatFixedPage() {
                           </div>
                         )}
                         {message.chartData && (
-                          <div className="mt-4 p-4 bg-card border border-border rounded-lg overflow-hidden">
-                            <div className="w-full">
-                              <ChartRenderer chartData={message.chartData} />
-                            </div>
+                          <div className="mt-4 p-4 sm:p-6 bg-card border border-border rounded-lg">
+                            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{message.chartData.title}</h3>
+                            <ChartRenderer chartData={message.chartData} />
                           </div>
                         )}
                         {message.sentimentData && (
@@ -830,8 +891,8 @@ export default function SimpleChatFixedPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyMessage(message.content, message.id)}
-                            className="text-xs p-1 h-auto interactive-hover ripple-effect transition-all hover:scale-110"
+                            onClick={(e) => copyMessage(message.content, message.id, e)}
+                            className="text-xs p-1 h-auto transition-all hover:scale-110 relative z-10"
                           >
                             {copiedId === message.id ? (
                               <Check className="w-3 h-3 text-green-500 bounce-once" />

@@ -1,27 +1,35 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X } from "lucide-react";
+import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ExportDropdown from "@/components/ui/export-dropdown";
 
-interface ChartDrillDownModalProps {
+interface DrillDownModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dataPoint: any;
-  chartType: string;
-  chartTitle: string;
-  onAnalyze: (dataPoint: any, chartType: string, chartTitle: string) => Promise<any>;
+  data: any;
+  title: string;
+  subtitle?: string;
+  type: 'chart' | 'metrics';
+  onAnalyze: (data: any, type: string, title: string) => Promise<any>;
+  fields?: Array<{
+    label: string;
+    value: string | number;
+    key: string;
+  }>;
 }
 
-export default function ChartDrillDownModal({ 
+export default function DrillDownModal({ 
   isOpen, 
   onClose, 
-  dataPoint, 
-  chartType, 
-  chartTitle, 
-  onAnalyze 
-}: ChartDrillDownModalProps) {
+  data, 
+  title,
+  subtitle,
+  type,
+  onAnalyze,
+  fields = []
+}: DrillDownModalProps) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
@@ -37,15 +45,15 @@ export default function ChartDrillDownModal({
   }, [isOpen]);
 
   // Safety check: Don't render if we don't have valid data
-  if (!isOpen || !dataPoint) {
+  if (!isOpen || !data) {
     return null;
   }
 
   const handleAnalyze = async () => {
     setIsLoading(true);
     try {
-      console.log("Starting chart analysis for:", dataPoint, chartType, chartTitle);
-      const result = await onAnalyze(dataPoint, chartType, chartTitle);
+      console.log(`Starting ${type} analysis for:`, data, title);
+      const result = await onAnalyze(data, type, title);
       console.log("Analysis result:", result);
       setAnalysis(result);
       setHasAnalyzed(true);
@@ -75,7 +83,7 @@ export default function ChartDrillDownModal({
 
   const handleExport = async (format: 'txt' | 'pdf' | 'json' | 'png') => {
     if (!analysis || !hasAnalyzed) {
-      alert("Please analyze the data point first before exporting");
+      alert("Please analyze the data first before exporting");
       return;
     }
 
@@ -104,13 +112,16 @@ export default function ChartDrillDownModal({
   };
 
   const exportAsText = async () => {
-    const textContent = `Chart Analysis Report
+    const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
+    const dataValue = data?.value || data?.metricValue || 'N/A';
+    
+    const textContent = `${type === 'chart' ? 'Chart' : 'Metrics'} Analysis Report
 ========================
 
-Chart: ${chartTitle}
-Type: ${chartType}
-Data Point: ${dataPoint?.label || dataPoint?.category || 'Unknown'}
-Value: ${dataPoint?.value || 'N/A'}
+${type === 'chart' ? 'Chart' : 'Metric'}: ${title}
+Type: ${type === 'chart' ? data?.chartType || 'N/A' : 'metrics'}
+Data Point: ${dataLabel}
+Value: ${dataValue}
 Generated: ${new Date().toLocaleString()}
 
 Analysis Summary:
@@ -121,7 +132,12 @@ ${analysis.breakdown?.keyInsights?.map((insight: any, index: number) =>
   `${index + 1}. ${typeof insight === 'string' ? insight : insight.text || 'N/A'}`
 ).join('\n') || 'No insights available'}
 
-Recommendations:
+${analysis.breakdown?.components?.length > 0 ? `Contributing Components:
+${analysis.breakdown.components.map((comp: any, index: number) => 
+  `${index + 1}. ${typeof comp === 'string' ? comp : comp.text || comp.name || 'N/A'}`
+).join('\n')}
+
+` : ''}Recommendations:
 ${analysis.recommendations?.map((rec: any, index: number) => 
   `${index + 1}. ${typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}`
 ).join('\n') || 'No recommendations available'}
@@ -135,20 +151,24 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel}_${new Date().toISOString().split('T')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const exportAsJSON = async () => {
+    const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
+    const dataValue = data?.value || data?.metricValue || 'N/A';
+    
     const jsonData = {
       exportDate: new Date().toISOString(),
-      chartAnalysis: {
-        chartTitle,
-        chartType,
+      analysisType: type,
+      [type === 'chart' ? 'chartAnalysis' : 'metricsAnalysis']: {
+        title,
+        type,
         dataPoint: {
-          label: dataPoint?.label || dataPoint?.category || 'Unknown',
-          value: dataPoint?.value || 'N/A'
+          label: dataLabel,
+          value: dataValue
         },
         analysis,
         metadata: {
@@ -163,22 +183,25 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel}_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const exportAsPDF = async () => {
+    const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
+    const dataValue = data?.value || data?.metricValue || 'N/A';
+    
     const exportData = {
-      chartTitle,
-      chartType,
+      chartTitle: title,
+      chartType: type === 'chart' ? data?.chartType || 'chart' : 'metrics',
       dataPoint: {
-        label: dataPoint?.label || dataPoint?.category || 'Unknown',
-        value: dataPoint?.value || 'N/A'
+        label: dataLabel,
+        value: dataValue
       },
       analysis,
       timestamp: new Date().toISOString(),
-      reportTitle: `Chart Analysis: ${dataPoint?.label || dataPoint?.category || 'Data Point'}`
+      reportTitle: `${type === 'chart' ? 'Chart' : 'Metrics'} Analysis: ${dataLabel}`
     };
 
     const response = await fetch('/api/export-chart-analysis', {
@@ -193,13 +216,13 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel}_${new Date().toISOString().split('T')[0]}.pdf`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
 
   const exportAsImage = async () => {
-    const modal = document.querySelector('.chart-drill-modal');
+    const modal = document.querySelector('.drill-down-modal');
     if (!modal) return;
 
     // Dynamic import to reduce bundle size
@@ -210,11 +233,36 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
       useCORS: true,
     });
 
+    const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
     const link = document.createElement('a');
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.png`;
+    link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel}_${new Date().toISOString().split('T')[0]}.png`;
     link.href = canvas.toDataURL();
     link.click();
   };
+
+  // Generate display fields based on type and provided fields
+  const getDisplayFields = () => {
+    if (fields.length > 0) {
+      return fields;
+    }
+
+    if (type === 'chart') {
+      return [
+        { label: 'Chart Type', value: data?.chartType || 'N/A', key: 'chartType' },
+        { label: 'Value', value: data?.value || 'N/A', key: 'value' },
+        { label: 'Label', value: data?.label || data?.category || 'Unknown', key: 'label' }
+      ];
+    } else {
+      return [
+        { label: 'Metric Type', value: 'Analytics Metric', key: 'metricType' },
+        { label: 'Value', value: data?.metricValue || 'N/A', key: 'metricValue' },
+        { label: 'Title', value: data?.metricTitle || 'Unknown', key: 'metricTitle' }
+      ];
+    }
+  };
+
+  const displayFields = getDisplayFields();
+  const Icon = type === 'chart' ? BarChart : Database;
 
   return (
     <div className={`fixed inset-0 z-50 ${isOpen ? 'block' : 'hidden'}`}>
@@ -227,16 +275,16 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
       {/* Modal */}
       <div className="fixed inset-0 overflow-y-auto">
         <div className="flex min-h-full items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl max-h-[80vh] overflow-y-auto bg-background border rounded-lg shadow-lg chart-drill-modal">
+          <div className="relative w-full max-w-4xl max-h-[80vh] overflow-y-auto bg-background border rounded-lg shadow-lg drill-down-modal">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <BarChart className="w-5 h-5" />
-                  Chart Analysis: {dataPoint?.label || dataPoint?.category || 'Data Point'}
+                  <Icon className="w-5 h-5" />
+                  {title}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Interactive chart drilling with detailed radio transcript analysis from OpenAI assistant
+                  {subtitle || `Interactive ${type} drilling with detailed radio transcript analysis from OpenAI assistant`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -269,22 +317,20 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Data Point Details</CardTitle>
-                  <CardDescription>Information about the selected chart element</CardDescription>
+                  <CardDescription>Information about the selected {type} element</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Chart Type</p>
-                      <Badge variant="outline">{chartType}</Badge>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Value</p>
-                      <p className="font-semibold">{dataPoint?.value || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Label</p>
-                      <p className="font-semibold">{dataPoint?.label || dataPoint?.category || 'Unknown'}</p>
-                    </div>
+                    {displayFields.map((field) => (
+                      <div key={field.key}>
+                        <p className="text-sm text-muted-foreground">{field.label}</p>
+                        {field.key === 'chartType' || field.key === 'metricType' ? (
+                          <Badge variant="outline">{field.value}</Badge>
+                        ) : (
+                          <p className="font-semibold">{field.value}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -330,6 +376,30 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
                       </p>
                     </CardContent>
                   </Card>
+
+                  {/* Contributing Components */}
+                  {analysis.breakdown?.components && analysis.breakdown.components.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Clock className="w-5 h-5" />
+                          Contributing Components
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-2">
+                          {analysis.breakdown.components.map((component: any, index: number) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-sm text-muted-foreground mt-1">•</span>
+                              <span className="text-sm">
+                                {typeof component === 'string' ? component : component.text || component.name || 'N/A'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Key Insights */}
                   {analysis.breakdown?.keyInsights && analysis.breakdown.keyInsights.length > 0 && (

@@ -5,10 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Azi - AI-Powered Data Analytics Platform</title>
-    <script type="module" crossorigin src="/assets/index-CwYYWjYp.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DqP0vj82.css">
+    <script type="module" crossorigin src="/assets/index-FpLhvEQV.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DRFPqUL-.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+    <script>
+      // Fallback detection - if React doesn't load within 5 seconds, show fallback
+      setTimeout(function() {
+        const root = document.getElementById('root');
+        if (root && root.innerHTML.trim() === '') {
+          root.innerHTML = `
+            <div style="padding: 40px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+              <h1 style="color: #1a2332; font-size: 2.5em; margin-bottom: 20px;">Azi Analytics Platform</h1>
+              <p style="color: #4a5568; font-size: 1.2em; margin-bottom: 30px;">Loading React application...</p>
+              <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="color: #718096; margin: 0;">If this message persists, the React app may have failed to load.</p>
+                <p style="color: #718096; margin: 10px 0 0 0;">Check the browser console (F12) for error details.</p>
+              </div>
+              <div style="margin-top: 30px;">
+                <a href="/api-docs" style="background: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-right: 10px;">API Documentation</a>
+                <button onclick="location.reload()" style="background: #48bb78; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer;">Reload</button>
+              </div>
+            </div>
+          `;
+        }
+      }, 5000);
+    </script>
   </body>
 </html>
