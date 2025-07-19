@@ -83,8 +83,6 @@ export default function SimpleChatFixedPage() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [showSuggestionHelp, setShowSuggestionHelp] = useState(false);
-  const [showChartHelp, setShowChartHelp] = useState(false);
-  const [showAllCharts, setShowAllCharts] = useState(false);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
 
   const [assistantPersonality, setAssistantPersonality] = useState("Analytical");
@@ -559,70 +557,6 @@ export default function SimpleChatFixedPage() {
     setInput(prompt);
   };
 
-  // Chart Generation Suggestions - All 10 types
-  const chartSuggestions = [
-    {
-      title: "Brand Mentions Over Time",
-      prompt: "Generate a line chart showing the number of times [brand] was mentioned on [station/program] over [time period].",
-      icon: "LineChart",
-      color: "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-    },
-    {
-      title: "Top Topics by Frequency", 
-      prompt: "Create a bar chart of the top [N] topics discussed on [station/program] during [time period].",
-      icon: "BarChart3",
-      color: "bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400"
-    },
-    {
-      title: "Sentiment Distribution",
-      prompt: "Show a pie chart of sentiment (positive, neutral, negative) for [brand/topic] mentions on [station] last [week/month].",
-      icon: "PieChart",
-      color: "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400"
-    },
-    {
-      title: "Brand vs Competitor",
-      prompt: "Display a grouped bar chart comparing mentions of [brand] and [competitor brand] on [station/program] for [time period].",
-      icon: "BarChart",
-      color: "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400"
-    },
-    {
-      title: "Sentiment Over Time",
-      prompt: "Generate a line chart showing how sentiment about [brand/topic] changed over [time period] on [station].",
-      icon: "Activity",
-      color: "bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400"
-    },
-    {
-      title: "Keyword Word Cloud",
-      prompt: "Create a word cloud of the most common keywords mentioned on [station/program] during [time period].",
-      icon: "Cloud",
-      color: "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400"
-    },
-    {
-      title: "Mentions by Presenter",
-      prompt: "Show a bar chart of [brand/topic] mentions broken down by presenter/program on [station] for [time period].",
-      icon: "Users",
-      color: "bg-cyan-100 dark:bg-cyan-900 text-cyan-600 dark:text-cyan-400"
-    },
-    {
-      title: "Top Guests by Mentions",
-      prompt: "Generate a bar chart of the top guests most frequently mentioned in radio transcripts on [station] over [time period].",
-      icon: "Target",
-      color: "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400"
-    },
-    {
-      title: "Topic Sentiment Comparison",
-      prompt: "Create a stacked bar chart comparing sentiment for the top [N] topics on [station/program] during [time period].",
-      icon: "BarChart3",
-      color: "bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400"
-    },
-    {
-      title: "Topic Correlation Matrix",
-      prompt: "Show a heatmap of how often different topics are mentioned together in transcripts from [station/program] during [time period].",
-      icon: "Grid3X3",
-      color: "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400"
-    }
-  ];
-
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       {/* Hamburger Menu */}
@@ -648,6 +582,7 @@ export default function SimpleChatFixedPage() {
               <div className="max-w-4xl mx-auto px-4">
 
                 {/* Suggestions Header with Help Icon */}
+                                {/* Dynamic Suggestions Header with Help Icon */}
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Radio Analysis Suggestions</h3>
                   <Button
@@ -659,6 +594,91 @@ export default function SimpleChatFixedPage() {
                     <HelpCircle className="w-4 h-4" />
                   </Button>
                 </div>
+
+                {/* Unified Suggestions Grid - All suggestions from backend API */}
+                <div className="flex justify-center w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 w-full max-w-5xl mx-auto">
+                    {isSuggestionsLoading
+                      ? Array.from({ length: 8 }).map((_, index) => (
+                          <Card key={`skeleton-${index}`} className="p-3 animate-pulse">
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              <div className="w-8 h-8 bg-muted rounded-md flex-shrink-0"></div>
+                              <div className="flex-1 min-w-0 w-full">
+                                <div className="h-3 bg-muted rounded mb-1"></div>
+                                <div className="h-2 bg-muted/70 rounded w-3/4 mx-auto"></div>
+                              </div>
+                            </div>
+                          </Card>
+                        ))
+                      : suggestions.slice(0, showAllSuggestions ? suggestions.length : 8).map((suggestion, index) => (
+                          <Card
+                            key={`suggestion-${index}`}
+                            className="p-3 cursor-pointer hover:bg-secondary/50 transition-all group suggestion-card interactive-hover ripple-effect fade-in-up"
+                            onClick={() => useSuggestion(suggestion.prompt)}
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              <div className={`p-2 rounded-md ${suggestion.color} flex-shrink-0`}>
+                                {/* Dynamic icon rendering based on suggestion.icon */}
+                                {suggestion.icon === 'BarChart3' && <BarChart3 className="w-4 h-4" />}
+                                {suggestion.icon === 'TrendingUp' && <TrendingUp className="w-4 h-4" />}
+                                {suggestion.icon === 'PieChart' && <PieChart className="w-4 h-4" />}
+                                {suggestion.icon === 'Target' && <Target className="w-4 h-4" />}
+                                {suggestion.icon === 'Zap' && <Zap className="w-4 h-4" />}
+                                {suggestion.icon === 'LayoutDashboard' && <LayoutDashboard className="w-4 h-4" />}
+                                {suggestion.icon === 'MessageSquare' && <MessageSquare className="w-4 h-4" />}
+                                {suggestion.icon === 'FileText' && <FileText className="w-4 h-4" />}
+                                {suggestion.icon === 'Users' && <Users className="w-4 h-4" />}
+                                {suggestion.icon === 'Database' && <Database className="w-4 h-4" />}
+                                {suggestion.icon === 'LineChart' && <LineChart className="w-4 h-4" />}
+                                {suggestion.icon === 'BarChart' && <BarChart className="w-4 h-4" />}
+                                {suggestion.icon === 'Activity' && <Activity className="w-4 h-4" />}
+                                {suggestion.icon === 'Cloud' && <Cloud className="w-4 h-4" />}
+                                {suggestion.icon === 'Grid3X3' && <Grid3X3 className="w-4 h-4" />}
+                                {/* Fallback icon for any suggestions without a mapped icon */}
+                                {!['BarChart3', 'TrendingUp', 'PieChart', 'Target', 'Zap', 'LayoutDashboard', 'MessageSquare', 'FileText', 'Users', 'Database', 'LineChart', 'BarChart', 'Activity', 'Cloud', 'Grid3X3'].includes(suggestion.icon) && 
+                                  <BarChart3 className="w-4 h-4" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-xs mb-1 group-hover:text-primary transition-colors leading-tight">
+                                  {suggestion.title}
+                                </h3>
+                                <span className="text-xs text-primary font-medium uppercase tracking-wide">
+                                  {suggestion.category}
+                                </span>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                  </div>
+                </div>
+
+                {/* Show More/Less Button for All Suggestions */}
+                {!showAllSuggestions && suggestions.length > 8 && (
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllSuggestions(true)}
+                      className="text-xs hover:bg-secondary/50"
+                    >
+                      Show More Suggestions ({suggestions.length - 8} more)
+                    </Button>
+                  </div>
+                )}
+
+                {showAllSuggestions && suggestions.length > 8 && (
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllSuggestions(false)}
+                      className="text-xs hover:bg-secondary/50"
+                    >
+                      Show Less
+                    </Button>
+                  </div>
+                )}
 
                 {/* Compact Suggestions Grid - Centered */}
                 <div className="flex justify-center w-full">
@@ -736,96 +756,6 @@ export default function SimpleChatFixedPage() {
                     </Button>
                   </div>
                 )}
-
-                {/* Chart Generation Suggestions */}
-                <div className="border-t border-border pt-4 mt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Chart Generation Prompts</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowChartHelp(true)}
-                      className="h-8 w-8 p-0 hover:bg-secondary/50"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex justify-center w-full">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full max-w-4xl mx-auto">
-                      {isSuggestionsLoading
-                        ? Array.from({ length: 4 }).map((_, index) => (
-                            <Card key={`chart-skeleton-${index}`} className="p-2 animate-pulse">
-                              <div className="flex flex-col items-center gap-1.5 text-center">
-                                <div className="w-8 h-8 bg-muted rounded-md flex-shrink-0"></div>
-                                <div className="flex-1 min-w-0 w-full">
-                                  <div className="h-3 bg-muted rounded mb-1"></div>
-                                  <div className="h-2 bg-muted/70 rounded w-1/2 mx-auto"></div>
-                                </div>
-                              </div>
-                            </Card>
-                          ))
-                        : chartSuggestions.slice(0, showAllCharts ? chartSuggestions.length : 4).map((chart, index) => (
-                            <Card
-                              key={index}
-                              className="p-2 cursor-pointer hover:bg-secondary/50 transition-all group suggestion-card interactive-hover ripple-effect fade-in-up"
-                              onClick={() => useSuggestion(chart.prompt)}
-                              style={{ animationDelay: `${(index + 8) * 100}ms` }}
-                            >
-                              <div className="flex flex-col items-center gap-1.5 text-center">
-                                <div className={`p-1.5 rounded-md ${chart.color} flex-shrink-0`}>
-                                  {chart.icon === 'LineChart' && <LineChart className="w-3 h-3" />}
-                                  {chart.icon === 'BarChart3' && <BarChart3 className="w-3 h-3" />}
-                                  {chart.icon === 'PieChart' && <PieChart className="w-3 h-3" />}
-                                  {chart.icon === 'BarChart' && <BarChart className="w-3 h-3" />}
-                                  {chart.icon === 'Activity' && <Activity className="w-3 h-3" />}
-                                  {chart.icon === 'Cloud' && <Cloud className="w-3 h-3" />}
-                                  {chart.icon === 'Users' && <Users className="w-3 h-3" />}
-                                  {chart.icon === 'Target' && <Target className="w-3 h-3" />}
-                                  {chart.icon === 'Grid3X3' && <Grid3X3 className="w-3 h-3" />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-xs mb-0.5 group-hover:text-primary transition-colors truncate leading-tight">
-                                    {chart.title}
-                                  </h4>
-                                  <span className="text-xs text-primary font-medium">
-                                    CHART
-                                  </span>
-                                </div>
-                              </div>
-                            </Card>
-                          ))}
-                    </div>
-                  </div>
-
-                  {/* Show More Button */}
-                  {!showAllCharts && chartSuggestions.length > 4 && (
-                    <div className="flex justify-center mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAllCharts(true)}
-                        className="text-xs hover:bg-secondary/50"
-                      >
-                        Show More Charts ({chartSuggestions.length - 4} more)
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Show Less Button */}
-                  {showAllCharts && (
-                    <div className="flex justify-center mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAllCharts(false)}
-                        className="text-xs hover:bg-secondary/50"
-                      >
-                        Show Less
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -1042,42 +972,21 @@ export default function SimpleChatFixedPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Chart Help Modal */}
-      <Dialog open={showChartHelp} onOpenChange={setShowChartHelp}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>📊 Chart Generation Prompts</DialogTitle>
-            <DialogDescription className="text-left">
-              These prompts create data visualizations from radio transcript analysis:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div className="bg-secondary/50 p-3 rounded-lg">
-              <div className="text-sm font-medium mb-2">Replace variables with specific data:</div>
-              <ul className="text-xs space-y-1 text-muted-foreground">
-                <li>• <strong>[brand]</strong> → Your brand name</li>
-                <li>• <strong>[station/program]</strong> → Radio station or show</li>
-                <li>• <strong>[time period]</strong> → Date range</li>
-                <li>• <strong>[N]</strong> → Number (e.g., "top 5")</li>
-                <li>• <strong>[topic]</strong> → Specific topic or theme</li>
-              </ul>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              <strong>Example:</strong> "Create a bar chart of the top 10 topics discussed on Metro FM during December"
-            </div>
-          </div>
-          <div className="flex gap-2 pt-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowChartHelp(false)}
-              className="flex-1"
-            >
-              Got it
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Smart Help Overlay */}
+      <SmartHelpOverlay 
+        isOpen={isHelpOpen} 
+        onClose={() => setIsHelpOpen(false)}
+        userContext={{
+          messageCount: messages.length,
+          lastChartTypes: [],
+          recentPrompts: [],
+          preferredTheme: 'system'
+        }}
+        onRecommendationClick={(action) => {
+          useSuggestion(action);
+          setIsHelpOpen(false);
+        }}
+      />
     </div>
   );
 }

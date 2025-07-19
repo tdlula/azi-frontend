@@ -10,6 +10,9 @@ pnpm-debug.log*
 # yarn.lock
 # pnpm-lock.yaml
 
+vite.config.local.ts
+vite.config.local.js
+
 # Runtime data
 pids
 *.pid

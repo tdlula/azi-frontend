@@ -70,8 +70,17 @@ export default function DashboardMinimal() {
   const isDashboardLoading = state.isDashboardLoading;
 
   useEffect(() => {
+    // Debug: Log current dashboard state
+    console.log('📊 Dashboard component mounted/updated:', {
+      hasData: !!state.dashboardData,
+      chartCount: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts).length : 0,
+      chartKeys: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts) : [],
+      isLoading: state.isDashboardLoading
+    });
+    
     // Only load data if not already loaded
     if (!state.dashboardData || Object.keys(state.dashboardData).length === 0) {
+      console.log('🔄 Loading dashboard data for first time...');
       loadDashboardData();
     }
 
@@ -79,7 +88,7 @@ export default function DashboardMinimal() {
     if (!state.wordCloudData || !state.wordCloudData.wordData || state.wordCloudData.wordData.length === 0) {
       loadWordCloudData();
     }
-  }, []);
+  }, [state.dashboardData]);
 
   const downloadDashboard = async () => {
     try {
@@ -117,7 +126,8 @@ export default function DashboardMinimal() {
 
   const loadMoreData = async () => {
     try {
-      await loadDashboardData();
+      console.log('🔄 Force refreshing dashboard data...');
+      await loadDashboardData(true); // Force refresh to bypass all caches
       await loadWordCloudData();
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -244,7 +254,11 @@ export default function DashboardMinimal() {
       if (count === 1) return "grid-cols-1";
       if (count === 2) return "grid-cols-1 lg:grid-cols-2";
       if (count === 3) return "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
-      return "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
+      if (count === 4) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-2";
+      if (count === 5) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+      if (count === 6) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+      if (count >= 7) return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+      return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
     };
 
     const gridLayout = getGridLayout(availableCharts.length);
@@ -305,12 +319,31 @@ export default function DashboardMinimal() {
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               Real-time insights from radio transcript analysis powered by OpenAI
             </p>
+            {/* Debug info */}
+            <div className="text-xs text-muted-foreground mt-1">
+              Charts: {dashboardData?.charts ? Object.keys(dashboardData.charts).length : 0} | 
+              Loading: {isDashboardLoading ? 'Yes' : 'No'} | 
+              <button 
+                onClick={() => console.log('Current dashboard data:', dashboardData)}
+                className="underline hover:text-primary ml-1"
+              >
+                Debug Log
+              </button>
+            </div>
           </div>
-          <HamburgerMenu 
-            onDownload={downloadDashboard}
-            onShare={shareDashboard}
-            onLoadMore={loadMoreData}
-          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => loadDashboardData(true)}
+              className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+            >
+              Force Refresh
+            </button>
+            <HamburgerMenu 
+              onDownload={downloadDashboard}
+              onShare={shareDashboard}
+              onLoadMore={loadMoreData}
+            />
+          </div>
         </div>
 
         {/* Metrics Cards */}

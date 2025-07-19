@@ -289,8 +289,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     // Use cache only if not forcing refresh and cache is valid
     if (!forceRefresh && cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
-      // Check if cached data has charts - if not, refresh anyway
-      if (cached.data?.charts?.monthlyTrend?.data) {
+      // Check if cached data has any charts - if not, refresh anyway
+      const hasValidCharts = cached.data?.charts && Object.keys(cached.data.charts).length > 0;
+      if (hasValidCharts) {
+        console.log('📊 Using cached dashboard data:', {
+          chartCount: Object.keys(cached.data.charts).length,
+          chartKeys: Object.keys(cached.data.charts)
+        });
         dispatch({ type: 'SET_DASHBOARD_DATA', payload: cached.data });
         return;
       }
@@ -300,9 +305,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Set loading state
       dispatch({ type: 'SET_DASHBOARD_LOADING', payload: true });
       
-      const response = await fetch('/api/dashboard-data');
+      // Add force refresh parameter to bypass backend cache too
+      const url = forceRefresh ? '/api/dashboard-data?force_refresh=true' : '/api/dashboard-data';
+      const response = await fetch(url);
       if (response.ok) {
         const dashboardData = await response.json();
+        console.log('📊 Received new dashboard data:', {
+          chartCount: dashboardData?.charts ? Object.keys(dashboardData.charts).length : 0,
+          chartKeys: dashboardData?.charts ? Object.keys(dashboardData.charts) : [],
+          forceRefresh
+        });
         dispatch({ type: 'SET_DASHBOARD_DATA', payload: dashboardData });
         dispatch({ 
           type: 'CACHE_RESPONSE', 
