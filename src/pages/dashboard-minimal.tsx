@@ -319,17 +319,6 @@ export default function DashboardMinimal() {
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               Real-time insights from radio transcript analysis powered by OpenAI
             </p>
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground mt-1">
-              Charts: {dashboardData?.charts ? Object.keys(dashboardData.charts).length : 0} | 
-              Loading: {isDashboardLoading ? 'Yes' : 'No'} | 
-              <button 
-                onClick={() => console.log('Current dashboard data:', dashboardData)}
-                className="underline hover:text-primary ml-1"
-              >
-                Debug Log
-              </button>
-            </div>
           </div>
           <div className="flex gap-2">
             <button
