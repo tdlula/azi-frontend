@@ -64,7 +64,7 @@ export default function NetworkHealthWidget() {
     
     const interval = setInterval(() => {
       fetchHealthMetrics();
-    }, 10000); // Update every 10 seconds
+    }, 600000); // Update every 10 minutes
 
     return () => clearInterval(interval);
   }, []);

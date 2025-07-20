@@ -29,15 +29,19 @@ export const ChartDataSchema = z.object({
   }).optional(),
 });
 
+/**
+ * Radio Analytics Metrics Schema
+ * These metrics are generated exclusively by the OpenAI assistant in the backend
+ * and provide comprehensive radio performance analytics
+ */
 export const DashboardMetricsSchema = z.object({
-  totalTranscripts: z.number(),
-  activeStations: z.number(),
-  topTopic: z.string(),
-  topStation: z.string(),
-  brandMentions: z.number().optional(),
-  sentimentScore: z.number().optional(),
-  growth: z.number().optional(),
-  engagement: z.number().optional(),
+  activeStations: z.number(),           // Number of unique radio stations active in last 30 days
+  topTopic: z.string(),                 // Most discussed topic across all radio segments
+  topStation: z.string(),               // Radio station with highest number of segments/mentions
+  topCampaign: z.number(),              // Campaign with highest audience reach
+  totalAudience: z.number(),            // Total estimated audience reach for all campaigns
+  highestSentimentCampaign: z.number(), // Campaign with most positive sentiment score
+  topPerformingTimeSlot: z.string(),    // Time slot with highest audience reach
 });
 
 export const DashboardSchema = z.object({

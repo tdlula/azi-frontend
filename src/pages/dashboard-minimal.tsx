@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Target, Activity, BarChart3 } from "lucide-react";
+import { TrendingUp, Users, Target, Activity, BarChart3, Filter, ChevronDown } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import ChartRenderer from "@/components/charts/ChartRenderer";
@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { DashboardSchema } from "@/schemas/dashboardSchema";
 import html2canvas from "html2canvas";
 import { useAppContext } from "@/contexts/AppContext";
+import topicsData from "@/data/topics.json";
 
 export default function DashboardMinimal() {
   const { state, loadDashboardData, loadWordCloudData } = useAppContext();
@@ -19,6 +20,10 @@ export default function DashboardMinimal() {
     type: 'chart' as 'chart' | 'metrics',
     fields: [] as Array<{ label: string; value: string | number; key: string }>
   });
+
+  // Filter state
+  const [selectedTopic, setSelectedTopic] = useState("general");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Use only authentic dashboard data from OpenAI assistant
   // Validate and normalize data structure using Zod schema
@@ -29,14 +34,13 @@ export default function DashboardMinimal() {
   // Default fallback structure to prevent null reference errors
   const defaultData = {
     metrics: {
-      totalTranscripts: 0,
       activeStations: 0,
       topTopic: "Loading...",
       topStation: "Loading...",
-      brandMentions: 0,
-      sentimentScore: 0,
-      growth: 0,
-      engagement: 0
+      topCampaign: 0,
+      totalAudience: 0,
+      highestSentimentCampaign: 0,
+      topPerformingTimeSlot: "Loading..."
     },
     charts: {}
   };
@@ -46,14 +50,13 @@ export default function DashboardMinimal() {
     const metrics = sourceData?.metrics || sourceData?.dashboard_metrics || sourceData?.dashboard?.metrics || {};
     return {
       metrics: {
-        totalTranscripts: metrics.totalTranscripts || metrics.total_transcripts || 0,
         activeStations: metrics.activeStations || metrics.active_stations || 0,
         topTopic: metrics.topTopic || metrics.top_topic || "Loading...",
         topStation: metrics.topStation || metrics.top_station || "Loading...",
-        brandMentions: metrics.brandMentions || metrics.brand_mentions || 0,
-        sentimentScore: metrics.sentimentScore || metrics.sentiment_score || 0,
-        growth: metrics.growth || 0,
-        engagement: metrics.engagement || 0
+        topCampaign: metrics.topCampaign || metrics.top_campaign || 0,
+        totalAudience: metrics.totalAudience || metrics.total_audience || 0,
+        highestSentimentCampaign: metrics.highestSentimentCampaign || metrics.highest_sentiment_campaign || 0,
+        topPerformingTimeSlot: metrics.topPerformingTimeSlot || metrics.top_performing_time_slot || "Loading..."
       },
       charts: sourceData?.charts || sourceData?.dashboard?.charts || {}
     };
@@ -75,20 +78,45 @@ export default function DashboardMinimal() {
       hasData: !!state.dashboardData,
       chartCount: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts).length : 0,
       chartKeys: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts) : [],
-      isLoading: state.isDashboardLoading
+      isLoading: state.isDashboardLoading,
+      selectedTopic
     });
     
     // Only load data if not already loaded
     if (!state.dashboardData || Object.keys(state.dashboardData).length === 0) {
       console.log('🔄 Loading dashboard data for first time...');
-      loadDashboardData();
+      loadDashboardData(false, selectedTopic);
     }
 
     // Load word cloud data separately
     if (!state.wordCloudData || !state.wordCloudData.wordData || state.wordCloudData.wordData.length === 0) {
       loadWordCloudData();
     }
-  }, [state.dashboardData]);
+  }, [state.dashboardData, selectedTopic]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isFilterOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.filter-dropdown')) {
+          setIsFilterOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterOpen]);
+
+  // Close dropdown when dashboard starts loading
+  useEffect(() => {
+    if (isDashboardLoading && isFilterOpen) {
+      setIsFilterOpen(false);
+    }
+  }, [isDashboardLoading, isFilterOpen]);
 
   const downloadDashboard = async () => {
     try {
@@ -127,7 +155,7 @@ export default function DashboardMinimal() {
   const loadMoreData = async () => {
     try {
       console.log('🔄 Force refreshing dashboard data...');
-      await loadDashboardData(true); // Force refresh to bypass all caches
+      await loadDashboardData(true, selectedTopic); // Force refresh to bypass all caches
       await loadWordCloudData();
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -143,7 +171,8 @@ export default function DashboardMinimal() {
       body: JSON.stringify({
         dataPoint: data,
         chartType: data.chartType || type,
-        chartTitle: data.chartTitle || title
+        chartTitle: data.chartTitle || title,
+        topic: selectedTopic !== 'general' ? selectedTopic : undefined
       }),
     });
 
@@ -161,7 +190,8 @@ export default function DashboardMinimal() {
       body: JSON.stringify({
         metricType: data.metricType,
         metricTitle: data.metricTitle,
-        metricValue: data.metricValue
+        metricValue: data.metricValue,
+        topic: selectedTopic !== 'general' ? selectedTopic : undefined
       }),
     });
 
@@ -207,10 +237,18 @@ export default function DashboardMinimal() {
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
                 <p className="text-sm sm:text-base">
-                  {isDashboardLoading ? 'AI generating dashboard insights...' : 'Loading dashboard...'}
+                  {isDashboardLoading ? 
+                    `AI generating ${selectedTopic !== 'general' ? selectedTopic + '-focused' : ''} dashboard insights...` : 
+                    'Loading dashboard...'
+                  }
                 </p>
                 {isDashboardLoading && (
-                  <p className="text-xs text-muted-foreground mt-1">Analyzing data patterns and trends</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedTopic !== 'general' ? 
+                      `Analyzing ${selectedTopic}-related data patterns and trends` :
+                      'Analyzing data patterns and trends'
+                    }
+                  </p>
                 )}
                 {schemaError && (
                   <p className="text-xs text-destructive mt-2">Schema validation error: {schemaError.message}</p>
@@ -311,7 +349,28 @@ export default function DashboardMinimal() {
     <div className="min-h-screen bg-background">
       <AppHeader />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
+        {/* Loading Overlay */}
+        {isDashboardLoading && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-lg font-medium">
+                {selectedTopic !== 'general' ? 
+                  `Updating charts for ${topicsData.find(t => t.value === selectedTopic)?.label}...` :
+                  'Updating dashboard...'
+                }
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {selectedTopic !== 'general' ? 
+                  `AI is analyzing ${selectedTopic}-related data patterns` :
+                  'AI is analyzing data patterns and trends'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+        
         {/* Navigation */}
         <div className="flex justify-between items-center mb-6 sm:mb-8">
           <div>
@@ -320,12 +379,58 @@ export default function DashboardMinimal() {
               Real-time insights from radio transcript analysis powered by OpenAI
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* Topic Filter Dropdown */}
+            <div className="relative filter-dropdown">
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                disabled={isDashboardLoading}
+                className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors ${
+                  isDashboardLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                <span>{topicsData.find(topic => topic.value === selectedTopic)?.label || "General"}</span>
+                {isDashboardLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+              
+              {isFilterOpen && !isDashboardLoading && (
+                <div className="absolute right-0 mt-2 w-40 bg-background border border-border rounded-md shadow-lg z-50">
+                  <div className="py-1">
+                    {topicsData.map((topic) => (
+                      <button
+                        key={topic.id}
+                        onClick={() => {
+                          setSelectedTopic(topic.value);
+                          setIsFilterOpen(false);
+                          // Load new dashboard data with the selected topic
+                          console.log(`Filter changed to: ${topic.label}`);
+                          loadDashboardData(true, topic.value); // Force refresh with new topic
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors ${
+                          selectedTopic === topic.value ? 'bg-accent text-accent-foreground' : ''
+                        }`}
+                      >
+                        {topic.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <button
-              onClick={() => loadDashboardData(true)}
-              className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+              onClick={() => loadDashboardData(true, selectedTopic)}
+              disabled={isDashboardLoading}
+              className={`px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors ${
+                isDashboardLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Force Refresh
+              {isDashboardLoading ? 'Updating...' : 'Force Refresh'}
             </button>
             <HamburgerMenu 
               onDownload={downloadDashboard}
@@ -335,61 +440,89 @@ export default function DashboardMinimal() {
           </div>
         </div>
 
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        {/* Radio Analytics Metrics - All 7 metrics in compact grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div 
-            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
-            onClick={() => handleMetricClick("total_transcripts", "Total Transcripts", dashboardData.metrics.totalTranscripts.toString())}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Transcripts</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground">{dashboardData.metrics.totalTranscripts}</p>
-                <p className="text-xs text-muted-foreground mt-1">Radio segments analyzed</p>
-              </div>
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div 
-            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
             onClick={() => handleMetricClick("active_stations", "Active Stations", dashboardData.metrics.activeStations.toString())}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Active Stations</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground">{dashboardData.metrics.activeStations}</p>
-                <p className="text-xs text-muted-foreground mt-1">Stations monitored</p>
-              </div>
-              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+            <div className="flex flex-col items-center text-center">
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Active Stations</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.activeStations}</p>
+              <p className="text-xs text-muted-foreground">Monitored</p>
             </div>
           </div>
 
           <div 
-            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            onClick={() => handleMetricClick("total_audience", "Total Audience", dashboardData.metrics.totalAudience.toString())}
+          >
+            <div className="flex flex-col items-center text-center">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Total Audience</p>
+              <p className="text-sm sm:text-lg font-bold text-foreground">{(dashboardData.metrics.totalAudience / 1000000).toFixed(1)}M</p>
+              <p className="text-xs text-muted-foreground">Reach</p>
+            </div>
+          </div>
+
+          <div 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
             onClick={() => handleMetricClick("top_topic", "Top Topic", dashboardData.metrics.topTopic)}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Topic</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground truncate">{dashboardData.metrics.topTopic}</p>
-                <p className="text-xs text-muted-foreground mt-1">Most discussed</p>
-              </div>
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+            <div className="flex flex-col items-center text-center">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Top Topic</p>
+              <p className="text-sm sm:text-base font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topTopic}</p>
+              <p className="text-xs text-muted-foreground">Discussed</p>
             </div>
           </div>
 
           <div 
-            className="p-4 sm:p-6 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
             onClick={() => handleMetricClick("top_station", "Top Station", dashboardData.metrics.topStation)}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Station</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground truncate">{dashboardData.metrics.topStation}</p>
-                <p className="text-xs text-muted-foreground mt-1">Most active</p>
-              </div>
-              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+            <div className="flex flex-col items-center text-center">
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Top Station</p>
+              <p className="text-sm sm:text-base font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topStation}</p>
+              <p className="text-xs text-muted-foreground">Active</p>
+            </div>
+          </div>
+
+          <div 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            onClick={() => handleMetricClick("top_campaign", "Top Campaign", dashboardData.metrics.topCampaign.toString())}
+          >
+            <div className="flex flex-col items-center text-center">
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Top Campaign</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.topCampaign}</p>
+              <p className="text-xs text-muted-foreground">Reach</p>
+            </div>
+          </div>
+
+          <div 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            onClick={() => handleMetricClick("highest_sentiment_campaign", "Best Sentiment", dashboardData.metrics.highestSentimentCampaign.toString())}
+          >
+            <div className="flex flex-col items-center text-center">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Best Sentiment</p>
+              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.highestSentimentCampaign}%</p>
+              <p className="text-xs text-muted-foreground">Score</p>
+            </div>
+          </div>
+
+          <div 
+            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            onClick={() => handleMetricClick("top_performing_time_slot", "Peak Time Slot", dashboardData.metrics.topPerformingTimeSlot)}
+          >
+            <div className="flex flex-col items-center text-center">
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
+              <p className="text-xs font-medium text-muted-foreground mb-1">Peak Time</p>
+              <p className="text-xs sm:text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topPerformingTimeSlot}</p>
+              <p className="text-xs text-muted-foreground">Slot</p>
             </div>
           </div>
         </div>

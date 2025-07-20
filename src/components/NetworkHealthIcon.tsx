@@ -44,7 +44,7 @@ export default function NetworkHealthIcon() {
 
   useEffect(() => {
     fetchHealthMetrics();
-    const interval = setInterval(fetchHealthMetrics, 15000); // Update every 15 seconds
+    const interval = setInterval(fetchHealthMetrics, 600000); // Update every 10 minutes
     return () => clearInterval(interval);
   }, []);
 

@@ -19,12 +19,13 @@ interface Conversation {
 
 interface DashboardData {
   metrics: {
-    totalTranscripts: number;
     activeStations: number;
     topTopic: string;
     topStation: string;
-    growth: number;
-    engagement: number;
+    topCampaign: number;
+    totalAudience: number;
+    highestSentimentCampaign: number;
+    topPerformingTimeSlot: string;
   };
   charts: {
     [key: string]: any; // Dynamic charts from OpenAI
@@ -179,7 +180,7 @@ const AppContext = createContext<{
   loadConversations: () => Promise<void>;
   loadMessages: (conversationId: number) => Promise<void>;
   loadSuggestions: () => Promise<void>;
-  loadDashboardData: (forceRefresh?: boolean) => Promise<void>;
+  loadDashboardData: (forceRefresh?: boolean, topic?: string) => Promise<void>;
   loadWordCloudData: (forceRefresh?: boolean) => Promise<void>;
   saveStateToSession: () => Promise<void>;
   loadStateFromSession: () => Promise<boolean>;
@@ -283,8 +284,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load dashboard data
-  const loadDashboardData = async (forceRefresh = false) => {
-    const cacheKey = 'dashboard-data';
+  const loadDashboardData = async (forceRefresh = false, topic?: string) => {
+    const cacheKey = topic && topic !== 'general' ? `dashboard-data-${topic}` : 'dashboard-data';
     const cached = state.cachedResponses.get(cacheKey);
     
     // Use cache only if not forcing refresh and cache is valid
@@ -294,7 +295,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (hasValidCharts) {
         console.log('📊 Using cached dashboard data:', {
           chartCount: Object.keys(cached.data.charts).length,
-          chartKeys: Object.keys(cached.data.charts)
+          chartKeys: Object.keys(cached.data.charts),
+          topic: topic || 'general'
         });
         dispatch({ type: 'SET_DASHBOARD_DATA', payload: cached.data });
         return;
@@ -305,15 +307,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Set loading state
       dispatch({ type: 'SET_DASHBOARD_LOADING', payload: true });
       
-      // Add force refresh parameter to bypass backend cache too
-      const url = forceRefresh ? '/api/dashboard-data?force_refresh=true' : '/api/dashboard-data';
+      // Build URL with force refresh and topic parameters
+      const params = new URLSearchParams();
+      if (forceRefresh) params.append('force_refresh', 'true');
+      if (topic && topic !== 'general') params.append('topic', topic);
+      
+      const url = `/api/dashboard-data${params.toString() ? '?' + params.toString() : ''}`;
       const response = await fetch(url);
       if (response.ok) {
         const dashboardData = await response.json();
         console.log('📊 Received new dashboard data:', {
           chartCount: dashboardData?.charts ? Object.keys(dashboardData.charts).length : 0,
           chartKeys: dashboardData?.charts ? Object.keys(dashboardData.charts) : [],
-          forceRefresh
+          forceRefresh,
+          topic: topic || 'general'
         });
         dispatch({ type: 'SET_DASHBOARD_DATA', payload: dashboardData });
         dispatch({ 

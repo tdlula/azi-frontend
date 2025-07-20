@@ -1,0 +1,22 @@
+[
+  {
+    "id": "general",
+    "label": "General",
+    "value": "general"
+  },
+  {
+    "id": "shopright",
+    "label": "Shopright",
+    "value": "shopright"
+  },
+  {
+    "id": "telkom",
+    "label": "Telkom",
+    "value": "telkom"
+  },
+  {
+    "id": "anc",
+    "label": "ANC",
+    "value": "anc"
+  }
+]

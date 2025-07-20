@@ -16,7 +16,7 @@ export interface BackendHealthData {
 }
 
 const HEALTH_CHECK_URL = '/api/health';
-const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+const HEALTH_CHECK_INTERVAL = 600000; // 10 minutes
 const MAX_RETRIES = 3;
 
 export function useBackendHealth() {
