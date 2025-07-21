@@ -728,13 +728,24 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                 const dataPoint = {
                   seriesIndex: config.seriesIndex,
                   dataPointIndex: config.dataPointIndex,
-                  value: selectedData.y,
-                  label: selectedData.x,
+                  value: selectedData.y || selectedData.value || selectedData,
+                  label: selectedData.x || selectedData.name || `${config.seriesIndex}-${config.dataPointIndex}`,
                   category: config.w.config.series[config.seriesIndex].name || 'Activity Level',
-                  x: selectedData.x,
-                  y: selectedData.y
+                  x: selectedData.x || selectedData.name,
+                  y: selectedData.y || selectedData.value,
+                  // Enhanced heatmap-specific data
+                  intensity: selectedData.y || selectedData.value,
+                  xCategory: selectedData.x || selectedData.name,
+                  yCategory: config.w.config.series[config.seriesIndex].name,
+                  coordinates: `${selectedData.x || selectedData.name} - ${config.w.config.series[config.seriesIndex].name}`,
+                  // Add original data for context
+                  originalItem: processedData.find(item => 
+                    (item.name === (selectedData.x || selectedData.name)) || 
+                    (item.x === selectedData.x && item.y === selectedData.y)
+                  )
                 };
-                onChartClick(dataPoint, 'heatmap', title || 'Heatmap');
+                console.log('Heatmap drill-down data:', dataPoint);
+                onChartClick(dataPoint, 'heatmap', title || 'Heatmap Analysis');
               }
             }
           }
@@ -745,48 +756,88 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         dataLabels: {
           enabled: true,
           style: {
-            colors: ['#fff']
+            colors: ['#fff'],
+            fontSize: '12px',
+            fontWeight: 'bold'
+          },
+          formatter: function(val: any, opts: any) {
+            // Show the actual value in the heatmap cell
+            return val || '';
           }
         },
         plotOptions: {
           heatmap: {
             shadeIntensity: 0.5,
-            radius: 0,
+            radius: 2,
             useFillColorAsStroke: true,
             colorScale: {
               ranges: [{
-                from: -30,
-                to: 5,
+                from: 0,
+                to: 25,
                 color: '#00A100',
-                name: 'low',
+                name: 'Low',
               }, {
-                from: 6,
-                to: 20,
+                from: 26,
+                to: 50,
                 color: '#128FD9',
-                name: 'medium',
+                name: 'Medium',
               }, {
-                from: 21,
-                to: 45,
+                from: 51,
+                to: 75,
                 color: '#FFB200',
-                name: 'high',
+                name: 'High',
               }, {
-                from: 46,
-                to: 55,
+                from: 76,
+                to: 100,
                 color: '#FF0000',
-                name: 'extreme',
+                name: 'Very High',
               }]
-            }
+            },
+            distributed: false
+          }
+        },
+        tooltip: {
+          custom: function({series, seriesIndex, dataPointIndex, w}: any) {
+            const data = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
+            const seriesName = w.globals.seriesNames[seriesIndex];
+            return `
+              <div class="bg-background border rounded p-3 shadow-lg">
+                <div class="font-semibold">${data.x || data.name}</div>
+                <div class="text-sm text-muted-foreground">${seriesName}</div>
+                <div class="font-medium">Value: ${data.y || data.value}</div>
+                <div class="text-xs text-muted-foreground mt-1">Click for detailed analysis</div>
+              </div>
+            `;
           }
         }
       };
 
-      const heatmapSeries = [{
-        name: 'Activity Level',
-        data: processedData.map((item, index) => ({
-          x: item.name,
-          y: Math.floor(item.value)
-        }))
-      }];
+      // Enhanced heatmap data processing
+      const heatmapSeries = (() => {
+        // Check if data has proper heatmap structure (x, y, value)
+        if (processedData.some(item => 'x' in item && 'y' in item && 'value' in item)) {
+          // Proper heatmap data with x, y coordinates
+          const categories = [...new Set(processedData.map(item => item.y))];
+          return categories.map(category => ({
+            name: String(category),
+            data: processedData
+              .filter(item => item.y === category)
+              .map(item => ({
+                x: String(item.x),
+                y: Number(item.value)
+              }))
+          }));
+        } else {
+          // Single series heatmap (convert from bar/line data)
+          return [{
+            name: 'Intensity',
+            data: processedData.map((item, index) => ({
+              x: String(item.name || `Item ${index + 1}`),
+              y: Math.floor(Number(item.value) || 0)
+            }))
+          }];
+        }
+      })();
 
       return <Chart options={heatmapOptions} series={heatmapSeries} type="heatmap" height={420} />;
 
