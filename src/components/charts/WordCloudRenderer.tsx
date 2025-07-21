@@ -27,18 +27,19 @@ export default function WordCloudRenderer({ chartData, onWordClick }: WordCloudR
     return fontSizeRange.min + (normalized * (fontSizeRange.max - fontSizeRange.min));
   };
 
-  // Color scheme based on sentiment or category
+  // Color scheme based on sentiment or category - improved for dark background compatibility
   const getWordColor = (word: any, index: number) => {
     if (word.sentiment) {
       switch (word.sentiment) {
-        case 'positive': return '#10b981'; // green
-        case 'negative': return '#ef4444'; // red
-        case 'neutral': return '#6b7280'; // gray
-        default: return '#3b82f6'; // blue
+        case 'positive': return '#34d399'; // Bright green
+        case 'negative': return '#f87171'; // Light red
+        case 'neutral': return '#9ca3af'; // Light gray
+        default: return '#60a5fa'; // Light blue
       }
     }
     
-    const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+    // Light, vibrant colors that work well on dark backgrounds
+    const colors = ['#60a5fa', '#a78bfa', '#06b6d4', '#34d399', '#fbbf24', '#f87171', '#fb7185', '#4ade80'];
     return colors[index % colors.length];
   };
 
@@ -55,13 +56,15 @@ export default function WordCloudRenderer({ chartData, onWordClick }: WordCloudR
             key={`${word.text}-${index}`}
             onClick={() => handleWordClick(word)}
             className={`
-              cursor-pointer transition-all duration-200 hover:scale-110 select-none
+              cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg select-none
               ${selectedWord === word.text ? 'opacity-100 font-bold' : 'opacity-80 hover:opacity-100'}
             `}
             style={{
               fontSize: `${getFontSize(word.value)}px`,
               color: getWordColor(word, index),
               fontWeight: word.value > maxValue * 0.7 ? 'bold' : 'normal',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 0 4px rgba(0, 0, 0, 0.3)',
+              filter: `brightness(${0.95 + (word.value / maxValue) * 0.15})`
             }}
             title={`${word.text}: ${word.value} occurrences${word.category ? ` (${word.category})` : ''}${word.sentiment ? ` - ${word.sentiment}` : ''}`}
           >

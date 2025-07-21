@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Target, Activity, BarChart3, Filter, ChevronDown } from "lucide-react";
+import { TrendingUp, Users, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import ChartRenderer from "@/components/charts/ChartRenderer";
@@ -339,10 +339,33 @@ export default function DashboardMinimal() {
   // Word cloud color function
   const getColorByFrequency = (value: number, max: number, min: number) => {
     const normalizedValue = (value - min) / (max - min);
-    const hue = 240 - (normalizedValue * 120); // Blue to red spectrum
-    const saturation = 60 + (normalizedValue * 40); // Increase saturation for higher values
-    const lightness = 40 + (normalizedValue * 30); // Increase lightness for higher values
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    
+    // Use a predefined color palette for better contrast and readability
+    const colorPalette = [
+      '#60a5fa', // Light blue
+      '#34d399', // Light green  
+      '#fbbf24', // Light yellow
+      '#f87171', // Light red
+      '#a78bfa', // Light purple
+      '#fb7185', // Light pink
+      '#4ade80', // Bright green
+      '#38bdf8', // Bright blue
+      '#facc15', // Bright yellow
+      '#f472b6'  // Bright pink
+    ];
+    
+    // For very high frequency words, use brighter colors
+    if (normalizedValue > 0.8) {
+      return '#ffffff'; // White for highest frequency
+    } else if (normalizedValue > 0.6) {
+      return '#fbbf24'; // Gold for high frequency
+    } else if (normalizedValue > 0.4) {
+      return '#60a5fa'; // Light blue for medium-high frequency
+    } else if (normalizedValue > 0.2) {
+      return '#34d399'; // Light green for medium frequency
+    } else {
+      return '#9ca3af'; // Light gray for low frequency
+    }
   };
 
   return (
@@ -443,85 +466,85 @@ export default function DashboardMinimal() {
         {/* Radio Analytics Metrics - All 7 metrics in compact grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("active_stations", "Active Stations", dashboardData.metrics.activeStations.toString())}
           >
-            <div className="flex flex-col items-center text-center">
-              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Active Stations</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.activeStations}</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <Radio className="h-4 w-4 text-blue-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Active Stations</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.activeStations}</p>
               <p className="text-xs text-muted-foreground">Monitored</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("total_audience", "Total Audience", dashboardData.metrics.totalAudience.toString())}
           >
-            <div className="flex flex-col items-center text-center">
-              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Total Audience</p>
-              <p className="text-sm sm:text-lg font-bold text-foreground">{(dashboardData.metrics.totalAudience / 1000000).toFixed(1)}M</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <Users className="h-4 w-4 text-green-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Total Audience</p>
+              <p className="text-lg font-bold text-foreground">{(dashboardData.metrics.totalAudience / 1000000).toFixed(1)}M</p>
               <p className="text-xs text-muted-foreground">Reach</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_topic", "Top Topic", dashboardData.metrics.topTopic)}
           >
-            <div className="flex flex-col items-center text-center">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Top Topic</p>
-              <p className="text-sm sm:text-base font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topTopic}</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <TrendingUp className="h-4 w-4 text-orange-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Top Topic</p>
+              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topTopic}</p>
               <p className="text-xs text-muted-foreground">Discussed</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_station", "Top Station", dashboardData.metrics.topStation)}
           >
-            <div className="flex flex-col items-center text-center">
-              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Top Station</p>
-              <p className="text-sm sm:text-base font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topStation}</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <Target className="h-4 w-4 text-purple-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Top Station</p>
+              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topStation}</p>
               <p className="text-xs text-muted-foreground">Active</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_campaign", "Top Campaign", dashboardData.metrics.topCampaign.toString())}
           >
-            <div className="flex flex-col items-center text-center">
-              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Top Campaign</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.topCampaign}</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <BarChart3 className="h-4 w-4 text-indigo-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Top Campaign</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.topCampaign}</p>
               <p className="text-xs text-muted-foreground">Reach</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("highest_sentiment_campaign", "Best Sentiment", dashboardData.metrics.highestSentimentCampaign.toString())}
           >
-            <div className="flex flex-col items-center text-center">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Best Sentiment</p>
-              <p className="text-lg sm:text-xl font-bold text-foreground">{dashboardData.metrics.highestSentimentCampaign}%</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <Award className="h-4 w-4 text-yellow-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Best Sentiment</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.highestSentimentCampaign}%</p>
               <p className="text-xs text-muted-foreground">Score</p>
             </div>
           </div>
 
           <div 
-            className="p-3 sm:p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200" 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_performing_time_slot", "Peak Time Slot", dashboardData.metrics.topPerformingTimeSlot)}
           >
-            <div className="flex flex-col items-center text-center">
-              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground mb-1" />
-              <p className="text-xs font-medium text-muted-foreground mb-1">Peak Time</p>
-              <p className="text-xs sm:text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topPerformingTimeSlot}</p>
+            <div className="flex flex-col items-center text-center space-y-1">
+              <Clock className="h-4 w-4 text-red-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">Peak Time</p>
+              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topPerformingTimeSlot}</p>
               <p className="text-xs text-muted-foreground">Slot</p>
             </div>
           </div>
@@ -547,15 +570,16 @@ export default function DashboardMinimal() {
                     return (
                       <span
                         key={index}
-                        className="word-cloud-word cursor-pointer inline-block m-1 p-2 rounded-md hover:bg-muted/40 relative transition-all duration-300"
+                        className="word-cloud-word cursor-pointer inline-block m-1 p-2 rounded-md hover:bg-muted/40 hover:scale-110 hover:shadow-lg relative transition-all duration-300"
                         style={{ 
                           fontSize: `${size}px`, 
                           opacity: opacity,
                           color: getColorByFrequency(word.value, maxValue, minValue),
                           fontWeight: word.value > maxValue * 0.6 ? 'bold' : 'normal',
                           animationDelay: `${index * 0.2}s`,
-                          textShadow: `0 0 ${Math.max(2, word.value / maxValue * 8)}px ${getColorByFrequency(word.value, maxValue, minValue)}40`,
-                          filter: `brightness(${0.9 + (word.value / maxValue) * 0.3})`
+                          textShadow: `0 1px 2px rgba(0, 0, 0, 0.3), 0 0 4px rgba(0, 0, 0, 0.2)`,
+                          filter: `brightness(${0.95 + (word.value / maxValue) * 0.15})`,
+                          transition: 'all 0.3s ease'
                         }}
                         onClick={() => {
                           const dataPoint = {
