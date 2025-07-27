@@ -66,8 +66,7 @@ export default function DrillDownModal({
           timeSegments: [],
           relatedTopics: [],
           keyInsights: []
-        },
-        recommendations: []
+        }
       });
     } finally {
       setIsLoading(false);
@@ -137,12 +136,7 @@ ${analysis.breakdown.components.map((comp: any, index: number) =>
   `${index + 1}. ${typeof comp === 'string' ? comp : comp.text || comp.name || 'N/A'}`
 ).join('\n')}
 
-` : ''}Recommendations:
-${analysis.recommendations?.map((rec: any, index: number) => 
-  `${index + 1}. ${typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}`
-).join('\n') || 'No recommendations available'}
-
-Radio Transcript Extracts:
+` : ''}Radio Transcript Extracts:
 ${analysis.radioExtracts?.map((extract: any, index: number) => 
   `${index + 1}. ${extract.quote || extract.text || 'N/A'}${extract.station ? ` - ${extract.station}` : ''}${extract.timestamp ? ` (${extract.timestamp})` : ''}`
 ).join('\n') || 'No extracts available'}`;
@@ -247,6 +241,37 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     }
 
     if (type === 'chart') {
+      const chartType = data?.chartType || '';
+      const chartTitle = data?.chartTitle || title || '';
+      
+      // Check if this is a Geo Sentiment or Topic Intensity chart
+      if (chartType.toLowerCase().includes('geo') || 
+          chartTitle.toLowerCase().includes('geo') ||
+          chartTitle.toLowerCase().includes('location') ||
+          chartTitle.toLowerCase().includes('sentiment') ||
+          chartTitle.toLowerCase().includes('topic intensity')) {
+        
+        // Format sentiment overview
+        const sentimentValue = data?.sentiment || data?.value || 0;
+        let sentimentOverview = null;
+        if (typeof sentimentValue === 'string') {
+          sentimentOverview = sentimentValue;
+        } else if (typeof sentimentValue === 'number') {
+          if (sentimentValue > 60) sentimentOverview = 'Positive';
+          else if (sentimentValue < 40) sentimentOverview = 'Negative';
+          else sentimentOverview = 'Neutral';
+        }
+        
+        return [
+          { label: 'Region/Label', value: data?.label || data?.category || data?.region, key: 'region' },
+          { label: 'Topic Intensity Score', value: data?.value || data?.intensity, key: 'intensity' },
+          { label: 'Sentiment Overview', value: sentimentOverview, key: 'sentiment' },
+          { label: 'Time Frame', value: data?.timeFrame, key: 'timeFrame' },
+          { label: 'Data Source', value: data?.dataSource, key: 'dataSource' }
+        ];
+      }
+      
+      // Default chart fields for other chart types
       return [
         { label: 'Chart Type', value: data?.chartType || 'N/A', key: 'chartType' },
         { label: 'Value', value: data?.value || 'N/A', key: 'value' },
@@ -326,6 +351,50 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
                         <p className="text-sm text-muted-foreground">{field.label}</p>
                         {field.key === 'chartType' || field.key === 'metricType' ? (
                           <Badge variant="outline">{field.value}</Badge>
+                        ) : field.key === 'sentiment' ? (
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant={
+                                field.value.toString().toLowerCase() === 'positive' ? 'default' :
+                                field.value.toString().toLowerCase() === 'negative' ? 'destructive' : 
+                                'secondary'
+                              }
+                              className={
+                                field.value.toString().toLowerCase() === 'positive' ? 'bg-green-500 text-white' :
+                                field.value.toString().toLowerCase() === 'negative' ? 'bg-red-500 text-white' : 
+                                'bg-gray-500 text-white'
+                              }
+                            >
+                              {field.value}
+                            </Badge>
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-300 ${
+                                  field.value.toString().toLowerCase() === 'positive' ? 'bg-green-500' :
+                                  field.value.toString().toLowerCase() === 'negative' ? 'bg-red-500' : 
+                                  'bg-gray-500'
+                                }`}
+                                style={{
+                                  width: field.value.toString().toLowerCase() === 'positive' ? '75%' :
+                                         field.value.toString().toLowerCase() === 'negative' ? '25%' : 
+                                         '50%'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : field.key === 'intensity' ? (
+                          <div className="space-y-1">
+                            <p className="font-semibold text-lg">{field.value}</p>
+                            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-300"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, Number(field.value) || 0))}%`
+                                }}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Intensity Level</p>
+                          </div>
                         ) : (
                           <p className="font-semibold">{field.value}</p>
                         )}
@@ -362,127 +431,193 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
 
               {analysis && hasAnalyzed && (
                 <div className="space-y-6">
-                  {/* Analysis Summary */}
+                  {/* Radio Content Analysis Header */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Lightbulb className="w-5 h-5" />
-                        Analysis Summary
+                        Radio Content Analysis: {analysis.topicName ? analysis.topicName : <span className="text-muted-foreground">No topic name available</span>}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm leading-relaxed">
-                        {analysis.summary || 'No summary available'}
-                      </p>
+                      <div className="space-y-2">
+                        <div><span className="font-semibold">Executive Summary:</span> {analysis.executiveSummary ? analysis.executiveSummary : (analysis.summary ? analysis.summary : <span className="text-muted-foreground">No summary available</span>)}</div>
+                        <div><span className="font-semibold">Topic:</span> {analysis.topicName ? analysis.topicName : <span className="text-muted-foreground">No topic name available</span>}</div>
+                        <div><span className="font-semibold">Frequency:</span> {typeof analysis.frequency !== 'undefined' && analysis.frequency !== null ? analysis.frequency + ' mentions' : <span className="text-muted-foreground">No frequency available</span>}</div>
+                        <div><span className="font-semibold">Data Source:</span> {analysis.dataSource ? analysis.dataSource : <span className="text-muted-foreground">No data source available</span>}</div>
+                        <div><span className="font-semibold">Key Finding:</span> {analysis.keyFinding ? analysis.keyFinding : <span className="text-muted-foreground">No key finding available</span>}</div>
+                      </div>
                     </CardContent>
                   </Card>
 
-                  {/* Contributing Components */}
-                  {analysis.breakdown?.components && analysis.breakdown.components.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Clock className="w-5 h-5" />
-                          Contributing Components
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {analysis.breakdown.components.map((component: any, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-sm text-muted-foreground mt-1">•</span>
-                              <span className="text-sm">
-                                {typeof component === 'string' ? component : component.text || component.name || 'N/A'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
+                  {/* 1. Topic Definition & Context */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>1. Topic Definition & Context</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div>{analysis.topicDefinition ? analysis.topicDefinition : <span className="text-muted-foreground">No topic definition available</span>}</div>
+                    </CardContent>
+                  </Card>
 
-                  {/* Key Insights */}
-                  {analysis.breakdown?.keyInsights && analysis.breakdown.keyInsights.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Tag className="w-5 h-5" />
-                          Key Insights
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {analysis.breakdown.keyInsights.map((insight: any, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-sm text-muted-foreground mt-1">•</span>
-                              <span className="text-sm">
-                                {typeof insight === 'string' ? insight : insight.text || 'N/A'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Recommendations */}
-                  {analysis.recommendations && analysis.recommendations.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="w-5 h-5" />
-                          Recommendations
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {analysis.recommendations.map((rec: any, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-sm text-muted-foreground mt-1">•</span>
-                              <span className="text-sm">
-                                {typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Radio Transcript Extracts */}
-                  {analysis.radioExtracts && analysis.radioExtracts.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Radio className="w-5 h-5" />
-                          Radio Transcript Extracts
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
+                  {/* 2. Key Contributing Factors */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>2. Key Contributing Factors</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {Array.isArray(analysis.contributingFactors) && analysis.contributingFactors.length > 0 ? (
                         <div className="space-y-4">
-                          {analysis.radioExtracts.map((extract: any, index: number) => (
-                            <div key={index} className="border-l-4 border-primary pl-4 py-2">
-                              <p className="text-sm font-medium">
-                                "{extract.quote || extract.text || 'N/A'}"
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                {extract.station && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {extract.station}
-                                  </Badge>
-                                )}
-                                {extract.timestamp && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {extract.timestamp}
-                                  </span>
-                                )}
-                              </div>
+                          {analysis.contributingFactors.map((factor: any, idx: number) => (
+                            <div key={idx}>
+                              <div className="font-semibold">2.{idx + 1} {factor.name ? factor.name : <span className="text-muted-foreground">No factor name</span>}</div>
+                              <div>{factor.description ? factor.description : <span className="text-muted-foreground">No description</span>}</div>
+                              {Array.isArray(factor.examples) && factor.examples.length > 0 ? (
+                                <div className="mt-1 ml-2">
+                                  <span className="font-medium">Examples:</span>
+                                  <ul className="list-disc ml-5">
+                                    {factor.examples.map((ex: string, exIdx: number) => (
+                                      <li key={exIdx} className="text-sm">"{ex}"</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
                             </div>
                           ))}
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                      ) : <span className="text-muted-foreground">No contributing factors available</span>}
+                    </CardContent>
+                  </Card>
+
+                  {/* 3. Peak Discussion Periods */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>3. Peak Discussion Periods</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-2 font-semibold">3.1 Prime Time Slots</div>
+                      {Array.isArray(analysis.peakPeriods?.primeTimeSlots) && analysis.peakPeriods.primeTimeSlots.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-xs border">
+                            <thead>
+                              <tr className="bg-muted">
+                                <th className="px-2 py-1 border">Station</th>
+                                <th className="px-2 py-1 border">Time Slot</th>
+                                <th className="px-2 py-1 border">Content Focus</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {analysis.peakPeriods.primeTimeSlots.map((slot: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="border px-2 py-1">{slot.station ? slot.station : <span className="text-muted-foreground">No station</span>}</td>
+                                  <td className="border px-2 py-1">{slot.timeRange ? slot.timeRange : <span className="text-muted-foreground">No time range</span>}</td>
+                                  <td className="border px-2 py-1">{slot.content ? slot.content : <span className="text-muted-foreground">No content</span>}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : <span className="text-muted-foreground">No prime time slots available</span>}
+                      <div className="mt-4 font-semibold">3.2 Optimal Broadcasting Windows</div>
+                      {Array.isArray(analysis.peakPeriods?.optimalWindows) && analysis.peakPeriods.optimalWindows.length > 0 ? (
+                        <ul className="list-disc ml-5">
+                          {analysis.peakPeriods.optimalWindows.map((win: any, idx: number) => (
+                            <li key={idx}>
+                              <span className="font-medium">{win.timePeriod ? win.timePeriod : <span className="text-muted-foreground">No time period</span>}:</span> {win.description ? win.description : <span className="text-muted-foreground">No description</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <span className="text-muted-foreground">No optimal broadcasting windows available</span>}
+                    </CardContent>
+                  </Card>
+
+                  {/* 4. Key Insights & Patterns */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>4. Key Insights & Patterns</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {Array.isArray(analysis.keyInsightsAndPatterns) && analysis.keyInsightsAndPatterns.length > 0 ? (
+                        <div className="space-y-4">
+                          {analysis.keyInsightsAndPatterns.map((insight: any, idx: number) => (
+                            <div key={idx}>
+                              <div className="font-semibold">4.{idx + 1} {insight.category ? insight.category : <span className="text-muted-foreground">No category</span>}</div>
+                              {insight.description ? <div>{insight.description}</div> : null}
+                              {Array.isArray(insight.bullets) && insight.bullets.length > 0 ? (
+                                <ul className="list-disc ml-5">
+                                  {insight.bullets.map((b: string, bIdx: number) => (
+                                    <li key={bIdx}>{b}</li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span className="text-muted-foreground">No key insights or patterns available</span>}
+                    </CardContent>
+                  </Card>
+
+                  {/* 5. Supporting Evidence: Station Quotes */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>5. Supporting Evidence: Station Quotes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {Array.isArray(analysis.stationQuotes) && analysis.stationQuotes.length > 0 ? (
+                        <div className="space-y-4">
+                          {analysis.stationQuotes.map((station: any, idx: number) => (
+                            <div key={idx}>
+                              <div className="font-semibold">{station.stationName ? station.stationName : <span className="text-muted-foreground">No station name</span>}</div>
+                              {Array.isArray(station.quotes) && station.quotes.length > 0 ? (
+                                <div className="space-y-2 ml-2">
+                                  {station.quotes.map((q: string, qIdx: number) => (
+                                    <div key={qIdx} className="italic">"{q}"</div>
+                                  ))}
+                                </div>
+                              ) : <span className="text-muted-foreground">No quotes available</span>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span className="text-muted-foreground">No station quotes available</span>}
+                    </CardContent>
+                  </Card>
+
+                  {/* 6. Business Impact */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>6. Business Impact</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {Array.isArray(analysis.businessImpact) && analysis.businessImpact.length > 0 ? (
+                        <div className="space-y-4">
+                          {analysis.businessImpact.map((impact: any, idx: number) => (
+                            <div key={idx}>
+                              <div className="font-semibold">6.{idx + 1} {impact.category ? impact.category : <span className="text-muted-foreground">No impact category</span>}</div>
+                              {Array.isArray(impact.benefits) && impact.benefits.length > 0 ? (
+                                <ul className="list-disc ml-5">
+                                  {impact.benefits.map((b: string, bIdx: number) => (
+                                    <li key={bIdx}>{b}</li>
+                                  ))}
+                                </ul>
+                              ) : <span className="text-muted-foreground">No benefits listed</span>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span className="text-muted-foreground">No business impact available</span>}
+                    </CardContent>
+                  </Card>
+
+                  {/* Data Sources */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Data Sources</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div><span className="font-semibold">Stations Analyzed:</span> {Array.isArray(analysis.stationsAnalyzed) && analysis.stationsAnalyzed.length > 0 ? analysis.stationsAnalyzed.join(', ') : <span className="text-muted-foreground">No stations listed</span>}</div>
+                      <div><span className="font-semibold">Analysis Period:</span> {analysis.analysisPeriod ? analysis.analysisPeriod : <span className="text-muted-foreground">No analysis period</span>}</div>
+                      <div><span className="font-semibold">Methodology:</span> {analysis.methodology ? analysis.methodology : <span className="text-muted-foreground">No methodology</span>}</div>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </div>

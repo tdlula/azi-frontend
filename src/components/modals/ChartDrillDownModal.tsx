@@ -58,8 +58,7 @@ export default function ChartDrillDownModal({
           timeSegments: [],
           relatedTopics: [],
           keyInsights: []
-        },
-        recommendations: []
+        }
       });
     } finally {
       setIsLoading(false);
@@ -104,38 +103,84 @@ export default function ChartDrillDownModal({
   };
 
   const exportAsText = async () => {
-    const textContent = `Chart Analysis Report
+    const textContent = `Radio Content Analysis Report
 ========================
 
-Chart: ${chartTitle}
-Type: ${chartType}
-Data Point: ${dataPoint?.label || dataPoint?.category || 'Unknown'}
-Value: ${dataPoint?.value || 'N/A'}
+Radio Content Analysis: ${dataPoint?.label || dataPoint?.category || 'Unknown'}
+
+Executive Summary
+Topic: ${dataPoint?.label || dataPoint?.category || 'Unknown'}
+Frequency: ${dataPoint?.value || 'N/A'} mentions
+Data Source: Radio Transcript Database
+Chart Type: ${chartType}
 Generated: ${new Date().toLocaleString()}
+Key Finding: ${analysis.summary || 'No key findings available from analysis.'}
 
-Analysis Summary:
-${analysis.summary || 'No summary available'}
+1. Topic Definition & Context
+${analysis.topicDefinition || analysis.summary || 'No topic definition or context available from analysis.'}
 
-Key Insights:
-${analysis.breakdown?.keyInsights?.map((insight: any, index: number) => 
-  `${index + 1}. ${typeof insight === 'string' ? insight : insight.text || 'N/A'}`
-).join('\n') || 'No insights available'}
+2. Key Contributing Factors
+${analysis.breakdown?.keyInsights?.slice(0, 5).map((insight: any, index: number) => 
+  `2.${index + 1} ${typeof insight === 'string' ? `Factor ${index + 1}` : insight.title || `Factor ${index + 1}`}
+${typeof insight === 'string' ? insight : insight.description || insight.text || 'No factor description available.'}
+${analysis.radioExtracts && analysis.radioExtracts[index] ? `Example: "${analysis.radioExtracts[index].quote || analysis.radioExtracts[index].text || 'No example quote available.'}"` : ''}
+`
+).join('\n') || 'No contributing factors data available from analysis.'}
 
-Recommendations:
-${analysis.recommendations?.map((rec: any, index: number) => 
-  `${index + 1}. ${typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}`
-).join('\n') || 'No recommendations available'}
+3. Peak Discussion Periods
+3.1 Prime Time Slots
+${analysis.peakDiscussionPeriods?.primeTimeSlots?.map((slot: any) => 
+  `${slot.station || 'Station'} | ${slot.timeSlot || 'Time'} | ${slot.contentFocus || 'Content'}`
+).join('\n') || 'No prime time slot data available from analysis.'}
 
-Radio Transcript Extracts:
-${analysis.radioExtracts?.map((extract: any, index: number) => 
-  `${index + 1}. ${extract.quote || extract.text || 'N/A'}${extract.station ? ` - ${extract.station}` : ''}${extract.timestamp ? ` (${extract.timestamp})` : ''}`
-).join('\n') || 'No extracts available'}`;
+3.2 Optimal Broadcasting Windows
+${analysis.peakDiscussionPeriods?.optimalWindows?.peakHours || 'No peak hours data available from analysis.'}
+${analysis.peakDiscussionPeriods?.optimalWindows?.primeTime || 'No prime time data available from analysis.'}
+
+4. Key Insights & Patterns
+4.1 Content Patterns
+${analysis.breakdown?.contentPatterns || 'No content patterns data available from analysis.'}
+
+4.2 Engagement Metrics
+${analysis.breakdown?.engagementMetrics?.map((metric: string) => `• ${metric}`).join('\n') || 'No engagement metrics data available from analysis.'}
+
+4.3 Communication Patterns
+${analysis.breakdown?.communicationPatterns || 'No communication patterns data available from analysis.'}
+
+5. Supporting Evidence: Station Quotes
+${analysis.radioExtracts && analysis.radioExtracts.length > 0 ? analysis.radioExtracts.slice(0, 4).map((extract: any, index: number) => 
+  `${extract.station || `Station ${index + 1}`}
+"${extract.quote || extract.text || 'Representative quote from radio transcript analysis'}"
+${extract.presenter ? `Presenter: ${extract.presenter}` : ''}${extract.show ? ` | Show: ${extract.show}` : ''}${extract.timestamp ? ` | ${new Date(extract.timestamp).toLocaleString()}` : ''}
+`
+).join('\n') : 'No specific radio extracts available for this analysis. Station quotes will be provided when AI analysis identifies relevant radio transcript content.'}
+
+6. Business Impact
+6.1 Audience Growth
+${analysis.businessImpact?.audienceGrowth?.map((item: string) => `• ${item}`).join('\n') || 'No audience growth data available from analysis.'}
+
+6.2 Revenue Opportunities
+${analysis.businessImpact?.revenueOpportunities?.map((item: string) => `• ${item}`).join('\n') || 'No revenue opportunities data available from analysis.'}
+
+Data Sources
+Stations Analyzed: ${analysis.dataSources?.stations?.join(', ') || 
+  (analysis.radioExtracts && analysis.radioExtracts.length > 0 
+    ? [...new Set(analysis.radioExtracts.map((extract: any) => extract.station).filter(Boolean))].join(', ')
+    : 'No station data available from analysis.')}
+Analysis Period: ${analysis.dataSources?.analysisPeriod || 'No analysis period data available from analysis.'}
+Methodology: ${analysis.dataSources?.methodology || 'No methodology data available from analysis.'}
+
+${analysis.dataSources?.sourceTranscripts && analysis.dataSources.sourceTranscripts.length > 0 ? 
+`Source Transcripts:
+${analysis.dataSources.sourceTranscripts.map((transcript: any, index: number) => 
+  `${index + 1}. ${transcript.station} | ${transcript.show} | ${transcript.date} | ID: ${transcript.transcriptId}${transcript.presenter ? ` | Presenter: ${transcript.presenter}` : ''}`
+).join('\n')}` : ''}`;
 
     const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `Radio_Content_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -143,7 +188,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
   const exportAsJSON = async () => {
     const jsonData = {
       exportDate: new Date().toISOString(),
-      chartAnalysis: {
+      radioContentAnalysis: {
         chartTitle,
         chartType,
         dataPoint: {
@@ -153,7 +198,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
         analysis,
         metadata: {
           exportFormat: 'json',
-          source: 'Azi Analytics Platform',
+          source: 'Azi Analytics Platform - Radio Content Analysis',
           userAgent: navigator.userAgent
         }
       }
@@ -163,7 +208,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `Radio_Content_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -178,7 +223,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
       },
       analysis,
       timestamp: new Date().toISOString(),
-      reportTitle: `Chart Analysis: ${dataPoint?.label || dataPoint?.category || 'Data Point'}`
+      reportTitle: `Radio Content Analysis: ${dataPoint?.label || dataPoint?.category || 'Data Point'}`
     };
 
     const response = await fetch('/api/export-chart-analysis', {
@@ -193,7 +238,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = `Radio_Content_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.pdf`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
@@ -211,7 +256,7 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
     });
 
     const link = document.createElement('a');
-    link.download = `Chart_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.png`;
+    link.download = `Radio_Content_Analysis_${dataPoint?.label || 'DataPoint'}_${new Date().toISOString().split('T')[0]}.png`;
     link.href = canvas.toDataURL();
     link.click();
   };
@@ -232,11 +277,11 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
             <div className="flex items-center justify-between p-6 border-b">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <BarChart className="w-5 h-5" />
-                  Chart Analysis: {dataPoint?.label || dataPoint?.category || 'Data Point'}
+                  <Radio className="w-5 h-5" />
+                  Radio Content Analysis: {dataPoint?.label || dataPoint?.category || 'Data Point'}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Interactive chart drilling with detailed radio transcript analysis from OpenAI assistant
+                  Comprehensive radio transcript analysis with AI-powered insights and business impact assessment
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -265,27 +310,37 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
 
             {/* Content */}
             <div className="p-6 space-y-6">
-              {/* Data Point Summary */}
+              {/* Executive Summary */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Data Point Details</CardTitle>
-                  <CardDescription>Information about the selected chart element</CardDescription>
+                  <CardTitle className="text-lg">Executive Summary</CardTitle>
+                  <CardDescription>Key information about the analyzed radio content</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Topic</p>
+                      <p className="font-semibold">{dataPoint?.label || dataPoint?.category || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Frequency</p>
+                      <p className="font-semibold">{dataPoint?.value || 'N/A'} mentions</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data Source</p>
+                      <p className="font-semibold">Radio Transcript Database</p>
+                    </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Chart Type</p>
                       <Badge variant="outline">{chartType}</Badge>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Value</p>
-                      <p className="font-semibold">{dataPoint?.value || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Label</p>
-                      <p className="font-semibold">{dataPoint?.label || dataPoint?.category || 'Unknown'}</p>
-                    </div>
                   </div>
+                  {analysis && analysis.summary && (
+                    <div className="mt-4">
+                      <p className="text-sm text-muted-foreground">Key Finding</p>
+                      <p className="font-medium text-sm mt-1">{analysis.summary}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -316,103 +371,303 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
 
               {analysis && hasAnalyzed && (
                 <div className="space-y-6">
-                  {/* Analysis Summary */}
+                  {/* 1. Topic Definition & Context */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Lightbulb className="w-5 h-5" />
-                        Analysis Summary
+                        1. Topic Definition & Context
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm leading-relaxed">
-                        {analysis.summary || 'No summary available'}
+                        {analysis.topicDefinition || analysis.summary || 'No topic definition or context available from analysis.'}
                       </p>
                     </CardContent>
                   </Card>
 
-                  {/* Key Insights */}
-                  {analysis.breakdown?.keyInsights && analysis.breakdown.keyInsights.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Tag className="w-5 h-5" />
-                          Key Insights
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {analysis.breakdown.keyInsights.map((insight: any, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-sm text-muted-foreground mt-1">•</span>
-                              <span className="text-sm">
-                                {typeof insight === 'string' ? insight : insight.text || 'N/A'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
+                  {/* 2. Key Contributing Factors */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Tag className="w-5 h-5" />
+                        2. Key Contributing Factors
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {analysis.breakdown?.keyInsights && analysis.breakdown.keyInsights.slice(0, 5).map((insight: any, index: number) => (
+                          <div key={index} className="border-l-4 border-primary/30 pl-4">
+                            <h4 className="font-medium text-sm mb-2">2.{index + 1} {typeof insight === 'string' ? `Factor ${index + 1}` : insight.title || `Factor ${index + 1}`}</h4>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {typeof insight === 'string' ? insight : insight.description || insight.text || 'No factor description available.'}
+                            </p>
+                            {analysis.radioExtracts && analysis.radioExtracts[index] && (
+                              <div className="mt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Example:</p>
+                                <p className="text-xs italic bg-muted/50 p-2 rounded">
+                                  "{analysis.radioExtracts[index].quote || analysis.radioExtracts[index].text || 'No example quote available.'}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )) || (
+                          <div className="text-sm text-muted-foreground">
+                            <p>No contributing factors data available from analysis.</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  {/* Recommendations */}
-                  {analysis.recommendations && analysis.recommendations.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="w-5 h-5" />
-                          Recommendations
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {analysis.recommendations.map((rec: any, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-sm text-muted-foreground mt-1">•</span>
-                              <span className="text-sm">
-                                {typeof rec === 'string' ? rec : rec.title || rec.description || 'N/A'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
+                  {/* 3. Peak Discussion Periods */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5" />
+                        3. Peak Discussion Periods
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-sm mb-3">3.1 Prime Time Slots</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs border-collapse border border-border">
+                              <thead>
+                                <tr className="bg-muted/50">
+                                  <th className="border border-border p-2 text-left">Station</th>
+                                  <th className="border border-border p-2 text-left">Time Slot</th>
+                                  <th className="border border-border p-2 text-left">Content Focus</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {analysis.peakDiscussionPeriods?.primeTimeSlots && analysis.peakDiscussionPeriods.primeTimeSlots.length > 0 ? (
+                                  analysis.peakDiscussionPeriods.primeTimeSlots.map((slot: any, index: number) => (
+                                    <tr key={index}>
+                                      <td className="border border-border p-2">{slot.station}</td>
+                                      <td className="border border-border p-2">{slot.timeSlot}</td>
+                                      <td className="border border-border p-2">{slot.contentFocus}</td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td className="border border-border p-2 text-center" colSpan={3}>
+                                      No prime time slots data available from analysis
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">3.2 Optimal Broadcasting Windows</h4>
+                          <div className="space-y-2 text-sm">
+                            {analysis.peakDiscussionPeriods?.optimalWindows ? (
+                              <>
+                                <p><span className="font-medium">Peak Hours:</span> {analysis.peakDiscussionPeriods.optimalWindows.peakHours}</p>
+                                <p><span className="font-medium">Prime Time:</span> {analysis.peakDiscussionPeriods.optimalWindows.primeTime}</p>
+                              </>
+                            ) : (
+                              <>
+                                <p><span className="font-medium">Peak Hours:</span> No peak hours data available from analysis</p>
+                                <p><span className="font-medium">Prime Time:</span> No prime time data available from analysis</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  {/* Radio Transcript Extracts */}
-                  {analysis.radioExtracts && analysis.radioExtracts.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Radio className="w-5 h-5" />
-                          Radio Transcript Extracts
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {analysis.radioExtracts.map((extract: any, index: number) => (
+                  {/* 4. Key Insights & Patterns */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        4. Key Insights & Patterns
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">4.1 Content Patterns</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {analysis.breakdown?.contentPatterns || 'No content patterns data available from analysis.'}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">4.2 Engagement Metrics</h4>
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {analysis.breakdown?.engagementMetrics && analysis.breakdown.engagementMetrics.length > 0 ? (
+                              analysis.breakdown.engagementMetrics.map((metric: string, index: number) => (
+                                <li key={index}>• {metric}</li>
+                              ))
+                            ) : (
+                              <>
+                                <li>• No engagement metrics data available from analysis</li>
+                              </>
+                            )}
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">4.3 Communication Patterns</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {analysis.breakdown?.communicationPatterns || 'No communication patterns data available from analysis.'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 5. Supporting Evidence: Station Quotes */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Radio className="w-5 h-5" />
+                        5. Supporting Evidence: Station Quotes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {analysis.radioExtracts && analysis.radioExtracts.length > 0 ? (
+                          analysis.radioExtracts.slice(0, 4).map((extract: any, index: number) => (
                             <div key={index} className="border-l-4 border-primary pl-4 py-2">
-                              <p className="text-sm font-medium">
-                                "{extract.quote || extract.text || 'N/A'}"
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                {extract.station && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {extract.station}
-                                  </Badge>
-                                )}
-                                {extract.timestamp && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {extract.timestamp}
-                                  </span>
-                                )}
+                              <h4 className="font-medium text-sm mb-2">{extract.station || `Station ${index + 1}`}</h4>
+                              <div className="space-y-2">
+                                <p className="text-sm italic bg-muted/30 p-3 rounded">
+                                  "{extract.quote || extract.text || 'No quote available'}"
+                                </p>
+                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  {extract.presenter && (
+                                    <span className="bg-muted/50 px-2 py-1 rounded">
+                                      Presenter: {extract.presenter}
+                                    </span>
+                                  )}
+                                  {extract.show && (
+                                    <span className="bg-muted/50 px-2 py-1 rounded">
+                                      Show: {extract.show}
+                                    </span>
+                                  )}
+                                  {extract.timestamp && (
+                                    <span className="bg-muted/50 px-2 py-1 rounded">
+                                      {new Date(extract.timestamp).toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          ))}
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground text-center py-8">
+                            <p>No radio extracts available for this analysis.</p>
+                            <p className="text-xs mt-2">Station quotes will appear here when AI analysis provides specific radio transcript content.</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 6. Business Impact */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart className="w-5 h-5" />
+                        6. Business Impact
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">6.1 Audience Growth</h4>
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {analysis.businessImpact?.audienceGrowth && analysis.businessImpact.audienceGrowth.length > 0 ? (
+                              analysis.businessImpact.audienceGrowth.map((item: string, index: number) => (
+                                <li key={index}>• {item}</li>
+                              ))
+                            ) : (
+                              <>
+                                <li>• No audience growth data available from analysis</li>
+                              </>
+                            )}
+                          </ul>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">6.2 Revenue Opportunities</h4>
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {analysis.businessImpact?.revenueOpportunities && analysis.businessImpact.revenueOpportunities.length > 0 ? (
+                              analysis.businessImpact.revenueOpportunities.map((item: string, index: number) => (
+                                <li key={index}>• {item}</li>
+                              ))
+                            ) : (
+                              <>
+                                <li>• No revenue opportunities data available from analysis</li>
+                              </>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Data Sources */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Data Sources</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-xs text-muted-foreground">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="font-medium mb-1">Stations Analyzed:</p>
+                          <p>
+                            {analysis.dataSources?.stations?.join(', ') || 
+                             (analysis.radioExtracts && analysis.radioExtracts.length > 0 
+                               ? [...new Set(analysis.radioExtracts.map((extract: any) => extract.station).filter(Boolean))].join(', ')
+                               : 'No station data available from analysis')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-medium mb-1">Analysis Period:</p>
+                          <p>{analysis.dataSources?.analysisPeriod || 'No analysis period data available from analysis'}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium mb-1">Methodology:</p>
+                          <p>{analysis.dataSources?.methodology || 'No methodology data available from analysis'}</p>
+                        </div>
+                      </div>
+                      {analysis.dataSources?.sourceTranscripts && analysis.dataSources.sourceTranscripts.length > 0 && (
+                        <div className="mt-4">
+                          <p className="font-medium mb-2">Source Transcripts:</p>
+                          <div className="space-y-2">
+                            {analysis.dataSources.sourceTranscripts.map((transcript: any, index: number) => (
+                              <div key={index} className="bg-muted/30 p-2 rounded text-xs">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  <div>
+                                    <span className="font-medium">Station:</span> {transcript.station}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Show:</span> {transcript.show}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Date:</span> {transcript.date}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">ID:</span> {transcript.transcriptId}
+                                  </div>
+                                  {transcript.presenter && (
+                                    <div className="md:col-span-2">
+                                      <span className="font-medium">Presenter:</span> {transcript.presenter}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </div>

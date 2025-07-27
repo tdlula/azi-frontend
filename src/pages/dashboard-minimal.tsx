@@ -1,16 +1,24 @@
-import { TrendingUp, Users, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap } from "lucide-react";
+import { TrendingUp, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap, Settings, Info } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import ChartRenderer from "@/components/charts/ChartRenderer";
 import DrillDownModal from "@/components/modals/DrillDownModal";
+import DashboardStatus from "@/components/DashboardStatus";
+import DateRangePicker, { getDefaultDateRange } from "@/components/DateRangePicker";
 import { useState, useEffect } from "react";
 import { DashboardSchema } from "@/schemas/dashboardSchema";
 import html2canvas from "html2canvas";
 import { useAppContext } from "@/contexts/AppContext";
 import topicsData from "@/data/topics.json";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { testFrontendBackendIntegration } from "@/utils/integrationTest";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 export default function DashboardMinimal() {
   const { state, loadDashboardData, loadWordCloudData } = useAppContext();
+  const { isAdminEnabled } = useAppConfig();
   
   const [drillDownModal, setDrillDownModal] = useState({
     isOpen: false,
@@ -25,6 +33,9 @@ export default function DashboardMinimal() {
   const [selectedTopic, setSelectedTopic] = useState("general");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
+  // Date range state
+  const [selectedDateRange, setSelectedDateRange] = useState(getDefaultDateRange());
+  
   // Use only authentic dashboard data from OpenAI assistant
   // Validate and normalize data structure using Zod schema
   const rawData: any = state.dashboardData;
@@ -38,7 +49,6 @@ export default function DashboardMinimal() {
       topTopic: "Loading...",
       topStation: "Loading...",
       topCampaign: 0,
-      totalAudience: 0,
       highestSentimentCampaign: 0,
       topPerformingTimeSlot: "Loading..."
     },
@@ -54,7 +64,6 @@ export default function DashboardMinimal() {
         topTopic: metrics.topTopic || metrics.top_topic || "Loading...",
         topStation: metrics.topStation || metrics.top_station || "Loading...",
         topCampaign: metrics.topCampaign || metrics.top_campaign || 0,
-        totalAudience: metrics.totalAudience || metrics.total_audience || 0,
         highestSentimentCampaign: metrics.highestSentimentCampaign || metrics.highest_sentiment_campaign || 0,
         topPerformingTimeSlot: metrics.topPerformingTimeSlot || metrics.top_performing_time_slot || "Loading..."
       },
@@ -79,20 +88,21 @@ export default function DashboardMinimal() {
       chartCount: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts).length : 0,
       chartKeys: state.dashboardData?.charts ? Object.keys(state.dashboardData.charts) : [],
       isLoading: state.isDashboardLoading,
-      selectedTopic
+      selectedTopic,
+      dateRange: selectedDateRange
     });
     
     // Only load data if not already loaded
     if (!state.dashboardData || Object.keys(state.dashboardData).length === 0) {
       console.log('🔄 Loading dashboard data for first time...');
-      loadDashboardData(false, selectedTopic);
+      loadDashboardData(false, selectedTopic, selectedDateRange);
     }
 
     // Load word cloud data separately
     if (!state.wordCloudData || !state.wordCloudData.wordData || state.wordCloudData.wordData.length === 0) {
       loadWordCloudData();
     }
-  }, [state.dashboardData, selectedTopic]);
+  }, [state.dashboardData, selectedTopic, selectedDateRange]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -117,6 +127,14 @@ export default function DashboardMinimal() {
       setIsFilterOpen(false);
     }
   }, [isDashboardLoading, isFilterOpen]);
+
+  // Setup integration test in browser console (development aid)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      (window as any).testIntegration = testFrontendBackendIntegration;
+      console.log('🔧 Integration test available: testIntegration()');
+    }
+  }, []);
 
   const downloadDashboard = async () => {
     try {
@@ -152,10 +170,18 @@ export default function DashboardMinimal() {
     }
   };
 
+  // Handle date range changes
+  const handleDateRangeChange = async (newDateRange: { from: Date; to: Date; label: string }) => {
+    console.log('📅 Date range changed:', newDateRange);
+    setSelectedDateRange(newDateRange);
+    // Force refresh with new date range
+    await loadDashboardData(true, selectedTopic, newDateRange);
+  };
+
   const loadMoreData = async () => {
     try {
       console.log('🔄 Force refreshing dashboard data...');
-      await loadDashboardData(true, selectedTopic); // Force refresh to bypass all caches
+      await loadDashboardData(true, selectedTopic, selectedDateRange); // Force refresh to bypass all caches
       await loadWordCloudData();
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -380,14 +406,14 @@ export default function DashboardMinimal() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-lg font-medium">
                 {selectedTopic !== 'general' ? 
-                  `Updating charts for ${topicsData.find(t => t.value === selectedTopic)?.label}...` :
-                  'Updating dashboard...'
+                  `Updating ${topicsData.find(t => t.value === selectedTopic)?.label} charts for ${selectedDateRange.label}...` :
+                  `Updating dashboard for ${selectedDateRange.label}...`
                 }
               </p>
               <p className="text-sm text-muted-foreground mt-2">
                 {selectedTopic !== 'general' ? 
-                  `AI is analyzing ${selectedTopic}-related data patterns` :
-                  'AI is analyzing data patterns and trends'
+                  `AI is analyzing ${selectedTopic}-related data patterns from ${selectedDateRange.label.toLowerCase()}` :
+                  `AI is analyzing data patterns and trends from ${selectedDateRange.label.toLowerCase()}`
                 }
               </p>
             </div>
@@ -408,6 +434,7 @@ export default function DashboardMinimal() {
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 disabled={isDashboardLoading}
+                title="Filter dashboard content by specific topics like Shoprite, Telkom, ANC, or view all general content"
                 className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors ${
                   isDashboardLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
@@ -422,7 +449,7 @@ export default function DashboardMinimal() {
               </button>
               
               {isFilterOpen && !isDashboardLoading && (
-                <div className="absolute right-0 mt-2 w-40 bg-background border border-border rounded-md shadow-lg z-50">
+                <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-md shadow-lg z-50">
                   <div className="py-1">
                     {topicsData.map((topic) => (
                       <button
@@ -432,13 +459,19 @@ export default function DashboardMinimal() {
                           setIsFilterOpen(false);
                           // Load new dashboard data with the selected topic
                           console.log(`Filter changed to: ${topic.label}`);
-                          loadDashboardData(true, topic.value); // Force refresh with new topic
+                          loadDashboardData(true, topic.value, selectedDateRange); // Force refresh with new topic
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors ${
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors group ${
                           selectedTopic === topic.value ? 'bg-accent text-accent-foreground' : ''
                         }`}
+                        title={topic.description}
                       >
-                        {topic.label}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{topic.label}</span>
+                          <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            {topic.description}
+                          </span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -446,28 +479,50 @@ export default function DashboardMinimal() {
               )}
             </div>
             
-            <button
-              onClick={() => loadDashboardData(true, selectedTopic)}
+            {/* Date Range Picker */}
+            <DateRangePicker
+              selectedRange={selectedDateRange}
+              onRangeChange={handleDateRangeChange}
               disabled={isDashboardLoading}
+            />
+            
+            <button
+              onClick={() => loadDashboardData(true, selectedTopic, selectedDateRange)}
+              disabled={isDashboardLoading}
+              title="Force refresh all dashboard data and charts by bypassing cache and requesting fresh AI-generated insights"
               className={`px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors ${
                 isDashboardLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               {isDashboardLoading ? 'Updating...' : 'Force Refresh'}
             </button>
-            <HamburgerMenu 
-              onDownload={downloadDashboard}
-              onShare={shareDashboard}
-              onLoadMore={loadMoreData}
-            />
+            <div title="Access additional dashboard options including downloads, sharing, theme settings, and navigation">
+              <HamburgerMenu 
+                onDownload={downloadDashboard}
+                onShare={shareDashboard}
+                onLoadMore={loadMoreData}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Radio Analytics Metrics - All 7 metrics in compact grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        {/* Dashboard Status Component - Only show if admin features enabled */}
+        {isAdminEnabled && (
+          <div className="mb-6">
+            <DashboardStatus 
+              onForceRefresh={() => loadDashboardData(true, selectedTopic, selectedDateRange)}
+              chartCount={Object.keys(dashboardData.charts || {}).length}
+              isLoading={isDashboardLoading}
+            />
+          </div>
+        )}
+
+        {/* Radio Analytics Metrics - All 6 metrics in compact grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("active_stations", "Active Stations", dashboardData.metrics.activeStations.toString())}
+            title="Click to drill down into active radio stations analysis with detailed AI insights about station performance and coverage"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <Radio className="h-4 w-4 text-blue-500 mb-1" />
@@ -479,19 +534,8 @@ export default function DashboardMinimal() {
 
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("total_audience", "Total Audience", dashboardData.metrics.totalAudience.toString())}
-          >
-            <div className="flex flex-col items-center text-center space-y-1">
-              <Users className="h-4 w-4 text-green-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Total Audience</p>
-              <p className="text-lg font-bold text-foreground">{(dashboardData.metrics.totalAudience / 1000000).toFixed(1)}M</p>
-              <p className="text-xs text-muted-foreground">Reach</p>
-            </div>
-          </div>
-
-          <div 
-            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_topic", "Top Topic", dashboardData.metrics.topTopic)}
+            title="Click to analyze the most discussed topic with AI-powered insights into conversation trends and sentiment patterns"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <TrendingUp className="h-4 w-4 text-orange-500 mb-1" />
@@ -504,6 +548,7 @@ export default function DashboardMinimal() {
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_station", "Top Station", dashboardData.metrics.topStation)}
+            title="Click to explore the most active radio station with detailed analytics about content, audience engagement, and broadcast patterns"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <Target className="h-4 w-4 text-purple-500 mb-1" />
@@ -516,6 +561,7 @@ export default function DashboardMinimal() {
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_campaign", "Top Campaign", dashboardData.metrics.topCampaign.toString())}
+            title="Click to analyze the highest reaching campaign with AI insights into effectiveness, audience impact, and content strategy"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <BarChart3 className="h-4 w-4 text-indigo-500 mb-1" />
@@ -528,6 +574,7 @@ export default function DashboardMinimal() {
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("highest_sentiment_campaign", "Best Sentiment", dashboardData.metrics.highestSentimentCampaign.toString())}
+            title="Click to dive deep into the campaign with the highest positive sentiment score and understand what makes content resonate with audiences"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <Award className="h-4 w-4 text-yellow-500 mb-1" />
@@ -540,6 +587,7 @@ export default function DashboardMinimal() {
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
             onClick={() => handleMetricClick("top_performing_time_slot", "Peak Time Slot", dashboardData.metrics.topPerformingTimeSlot)}
+            title="Click to analyze the peak performance time slot with insights into audience behavior, content effectiveness, and optimal scheduling strategies"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <Clock className="h-4 w-4 text-red-500 mb-1" />
@@ -571,6 +619,7 @@ export default function DashboardMinimal() {
                       <span
                         key={index}
                         className="word-cloud-word cursor-pointer inline-block m-1 p-2 rounded-md hover:bg-muted/40 hover:scale-110 hover:shadow-lg relative transition-all duration-300"
+                        title={`Click to analyze "${word.text}" topic - mentioned ${word.value} times. Get AI insights into context, sentiment, and related discussions.`}
                         style={{ 
                           fontSize: `${size}px`, 
                           opacity: opacity,

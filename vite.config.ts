@@ -2,6 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const isDev = process.env.NODE_ENV !== 'production' && process.env.npm_lifecycle_event !== 'build';
+const devBackend = 'http://localhost:5000';
+const prodBackend = 'http://129.151.191.161:7000';
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,7 +17,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        target: "http://129.151.191.161:7000" , // http://localhost:5000
+        target: isDev ? devBackend : prodBackend,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Keep the /api prefix
@@ -30,9 +34,9 @@ export default defineConfig({
       }
     }
   },
-  // Environment variables for production backend
+  // Environment variables for backend
   define: {
-    __BACKEND_URL__: JSON.stringify(process.env.VITE_BACKEND_URL || 'http://129.151.191.161:7000'),
+    __BACKEND_URL__: JSON.stringify(isDev ? devBackend : prodBackend),
   },
   // Clear cache on dev server restart
   clearScreen: false,

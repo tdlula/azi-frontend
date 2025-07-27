@@ -39,7 +39,6 @@ export const DashboardMetricsSchema = z.object({
   topTopic: z.string(),                 // Most discussed topic across all radio segments
   topStation: z.string(),               // Radio station with highest number of segments/mentions
   topCampaign: z.number(),              // Campaign with highest audience reach
-  totalAudience: z.number(),            // Total estimated audience reach for all campaigns
   highestSentimentCampaign: z.number(), // Campaign with most positive sentiment score
   topPerformingTimeSlot: z.string(),    // Time slot with highest audience reach
 });

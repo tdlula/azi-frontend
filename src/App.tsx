@@ -5,6 +5,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardMinimal from "@/pages/dashboard-minimal";
 import SimpleChatFixed from "@/pages/simple-chat-fixed";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -26,7 +27,9 @@ function App() {
               <Switch>
                 <Route path="/" component={DashboardMinimal} />
                 <Route path="/dashboard" component={DashboardMinimal} />
+                <Route path="/dashboard-minimal" component={DashboardMinimal} />
                 <Route path="/chat" component={SimpleChatFixed} />
+                <Route path="/settings" component={SettingsPage} />
                 <Route component={NotFound} />
               </Switch>
             </Router>

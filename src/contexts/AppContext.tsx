@@ -23,7 +23,6 @@ interface DashboardData {
     topTopic: string;
     topStation: string;
     topCampaign: number;
-    totalAudience: number;
     highestSentimentCampaign: number;
     topPerformingTimeSlot: string;
   };
@@ -180,7 +179,7 @@ const AppContext = createContext<{
   loadConversations: () => Promise<void>;
   loadMessages: (conversationId: number) => Promise<void>;
   loadSuggestions: () => Promise<void>;
-  loadDashboardData: (forceRefresh?: boolean, topic?: string) => Promise<void>;
+  loadDashboardData: (forceRefresh?: boolean, topic?: string, dateRange?: { from: Date; to: Date }) => Promise<void>;
   loadWordCloudData: (forceRefresh?: boolean) => Promise<void>;
   saveStateToSession: () => Promise<void>;
   loadStateFromSession: () => Promise<boolean>;
@@ -284,8 +283,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load dashboard data
-  const loadDashboardData = async (forceRefresh = false, topic?: string) => {
-    const cacheKey = topic && topic !== 'general' ? `dashboard-data-${topic}` : 'dashboard-data';
+  const loadDashboardData = async (forceRefresh = false, topic?: string, dateRange?: { from: Date; to: Date }) => {
+    const dateKey = dateRange ? `${dateRange.from.toISOString().split('T')[0]}-${dateRange.to.toISOString().split('T')[0]}` : 'default';
+    const cacheKey = topic && topic !== 'general' ? `dashboard-data-${topic}-${dateKey}` : `dashboard-data-${dateKey}`;
     const cached = state.cachedResponses.get(cacheKey);
     
     // Use cache only if not forcing refresh and cache is valid
@@ -307,10 +307,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Set loading state
       dispatch({ type: 'SET_DASHBOARD_LOADING', payload: true });
       
-      // Build URL with force refresh and topic parameters
+      // Build URL with force refresh, topic, and date range parameters
       const params = new URLSearchParams();
       if (forceRefresh) params.append('force_refresh', 'true');
       if (topic && topic !== 'general') params.append('topic', topic);
+      if (dateRange) {
+        params.append('from_date', dateRange.from.toISOString().split('T')[0]);
+        params.append('to_date', dateRange.to.toISOString().split('T')[0]);
+      }
       
       const url = `/api/dashboard-data${params.toString() ? '?' + params.toString() : ''}`;
       const response = await fetch(url);

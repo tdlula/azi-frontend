@@ -2,21 +2,25 @@
   {
     "id": "general",
     "label": "General",
-    "value": "general"
+    "value": "general",
+    "description": "All radio content and comprehensive analytics across all topics and stations"
   },
   {
-    "id": "shopright",
-    "label": "Shopright",
-    "value": "shopright"
+    "id": "shoprite",
+    "label": "Shoprite",
+    "value": "shoprite",
+    "description": "Retail and grocery chain mentions, promotions, and customer sentiment analysis"
   },
   {
     "id": "telkom",
     "label": "Telkom",
-    "value": "telkom"
+    "value": "telkom",
+    "description": "Telecommunications company coverage, service discussions, and network-related content"
   },
   {
     "id": "anc",
     "label": "ANC",
-    "value": "anc"
+    "value": "anc",
+    "description": "African National Congress political party coverage, policies, and public discourse"
   }
 ]

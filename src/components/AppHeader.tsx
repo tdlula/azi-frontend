@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { BarChart3, Activity, MessageSquare } from "lucide-react";
+import { BarChart3, Settings } from "lucide-react";
 import NetworkHealthIcon from "@/components/NetworkHealthIcon";
 import { Link, useLocation } from "wouter";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 export default function AppHeader() {
   const [location] = useLocation();
+  const { isAdminEnabled } = useAppConfig();
 
   return (
     <div className="bg-card border-b border-border p-3 sm:p-4 shadow-xl">
@@ -23,6 +25,23 @@ export default function AppHeader() {
           </div>
 
 
+        </div>
+
+        {/* Center - Navigation Links */}
+        <div className="flex items-center gap-2">
+          {/* Conditionally show Settings button based on admin configuration */}
+          {isAdminEnabled && (
+            <Link href="/settings">
+              <Button 
+                variant={location === "/settings" ? "default" : "ghost"} 
+                size="sm"
+                className="gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Right side - Utility Controls */}

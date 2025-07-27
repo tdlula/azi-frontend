@@ -31,7 +31,10 @@ import {
   Hash,
   Grid3X3,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  XCircle,
+  ArrowLeft,
+  ArrowRight
 } from "lucide-react";
 import ChartRenderer from "@/components/charts/ChartRenderer";
 import SentimentTable from "@/components/SentimentTable";
@@ -46,11 +49,11 @@ import { useAppContext } from "@/contexts/AppContext";
 // Generate unique IDs for messages to prevent React key warnings
 let messageIdCounter = 0;
 const generateUniqueId = () => {
-  return `${Date.now()}-${++messageIdCounter}`;
+  return Date.now() + ++messageIdCounter;
 };
 
 interface Message {
-  id: string;
+  id: number;
   content: string;
   role: "user" | "assistant";
   timestamp: Date;
@@ -68,15 +71,13 @@ interface Suggestion {
 }
 
 export default function SimpleChatFixedPage() {
+  // ...existing code...
+  // Restore context state extraction for chat page
   const { state, dispatch, loadMessages, loadSuggestions } = useAppContext();
-  
-  // Use persistent state from context
   const messages = state.messages;
   const suggestions = state.suggestions;
   const isLoading = state.isLoading;
   const isSuggestionsLoading = state.isSuggestionsLoading;
-  
-  // Local UI state that doesn't need persistence
   const [input, setInput] = useState("");
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
@@ -84,6 +85,8 @@ export default function SimpleChatFixedPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [showSuggestionHelp, setShowSuggestionHelp] = useState(false);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(true);
+  const [suggestionSearch, setSuggestionSearch] = useState("");
 
   const [assistantPersonality, setAssistantPersonality] = useState("Analytical");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -92,6 +95,8 @@ export default function SimpleChatFixedPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Restore sidebarRef for sidebar DOM access
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const scrollToTop = () => {
     messagesTopRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -116,8 +121,17 @@ export default function SimpleChatFixedPage() {
   }, []);
 
   const fetchSuggestions = async () => {
-    // Use context function for loading suggestions with caching
-    await loadSuggestions();
+    // Fetch chart suggestions directly from backend
+    try {
+      const response = await fetch('/api/chart-suggestions');
+      if (response.ok) {
+        const data = await response.json();
+        // Use 'suggestions' array from response
+        dispatch({ type: 'SET_SUGGESTIONS', payload: data.suggestions || data.prompts || [] });
+      }
+    } catch (error) {
+      console.error('Failed to load chart suggestions:', error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -560,210 +574,160 @@ export default function SimpleChatFixedPage() {
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       {/* Hamburger Menu */}
-      <HamburgerMenu 
-        onScreenshot={() => console.log('Screenshot taken')}
-        onShareUrl={() => console.log('URL shared')}
-        onCopyContent={() => console.log('Content copied')}
-        onExportData={() => console.log('Data exported')}
-        onDownloadChat={downloadChatHistory}
-        onShareChat={shareChatHistory}
-      />
+      <div style={{ paddingTop: '-7rem' }}>
+        <HamburgerMenu
+          onScreenshot={() => console.log('Screenshot taken')}
+          onShareUrl={() => console.log('URL shared')}
+          onCopyContent={() => console.log('Content copied')}
+          onExportData={() => console.log('Data exported')}
+          onDownloadChat={downloadChatHistory}
+          onShareChat={shareChatHistory}
+        />
+      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col chat-area">
         {/* Consistent Header */}
         <AppHeader />
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Persistent Word Cloud and Suggestions */}
-          <div className="border-b border-border bg-background/95 backdrop-blur-sm">
-            <div className="text-center py-4">
-              <div className="max-w-4xl mx-auto px-4">
+      <div className="flex-1 flex flex-row relative">
+        {/* Top right Show Suggestion Prompt button (only when dialog is closed) */}
+        <div className="absolute right-8 top-4 z-50">
+          <div
+            style={{
+              transition: 'opacity 0.5s cubic-bezier(0.4,0,0.2,1), transform 0.5s cubic-bezier(0.4,0,0.2,1)',
+              opacity: !suggestionsDialogOpen ? 1 : 0,
+              transform: !suggestionsDialogOpen ? 'translateY(0)' : 'translateY(-20px)',
+              pointerEvents: !suggestionsDialogOpen ? 'auto' : 'none',
+            }}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSuggestionsDialogOpen(true)}
+              className="rounded-full px-4 h-10 shadow-lg"
+            >
+              Show Suggestion Prompt
+            </Button>
+          </div>
+        </div>
 
-                {/* Suggestions Header with Help Icon */}
-                                {/* Dynamic Suggestions Header with Help Icon */}
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium text-muted-foreground">Radio Analysis Suggestions</h3>
+        {/* Suggestions Docked Right */}
+        {suggestionsDialogOpen && (
+          <div
+            ref={sidebarRef}
+            className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-lg z-40 flex flex-col"
+            style={{
+              willChange: 'transform, opacity',
+              transition: 'opacity 0.6s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1)',
+              opacity: suggestionsDialogOpen ? 1 : 0,
+              transform: suggestionsDialogOpen ? 'translateX(0)' : 'translateX(100px)',
+              boxShadow: suggestionsDialogOpen ? '-20px 0 60px rgba(0,0,0,0.15)' : 'none',
+              minWidth: '320px',
+              maxWidth: '400px',
+            }}
+          >
+            {/* ...existing code for suggestions panel... */}
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="text-sm font-medium text-muted-foreground">Radio Analysis Suggestions</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSuggestionsDialogOpen(false)}
+                className="h-8 w-8 p-0 hover:bg-secondary/50 transition-transform duration-300"
+                title="Close Suggestions"
+              >
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+            {/* Suggestions Search Input */}
+            <div className="px-4 pt-3 pb-2">
+              <Input
+                type="text"
+                value={suggestionSearch}
+                onChange={e => setSuggestionSearch(e.target.value)}
+                placeholder="Search suggestions..."
+                className="w-full h-9 rounded-md border border-border px-3 text-sm focus:border-primary focus:ring-0"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-2" style={{ paddingBottom: '64px' }}>
+              {/* ...existing code for suggestions list... */}
+              {isSuggestionsLoading
+                ? Array.from({ length: 8 }).map((_, index) => (
+                    <Card key={`skeleton-${index}`} className="p-3 animate-pulse mb-2">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <div className="w-8 h-8 bg-muted rounded-md flex-shrink-0"></div>
+                        <div className="flex-1 min-w-0 w-full">
+                          <div className="h-3 bg-muted rounded mb-1"></div>
+                          <div className="h-2 bg-muted/70 rounded w-3/4 mx-auto"></div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                : suggestions
+                    .filter(suggestion =>
+                      (suggestion.title?.toLowerCase() || '').includes(suggestionSearch.toLowerCase())
+                    )
+                    .slice(0, showAllSuggestions ? suggestions.length : 12)
+                    .map((suggestion, index) => (
+                      <Card
+                        key={`suggestion-${index}`}
+                        className="p-3 cursor-pointer hover:bg-secondary/50 transition-all group suggestion-card interactive-hover ripple-effect fade-in-up mb-2"
+                        onClick={() => useSuggestion(suggestion.prompt)}
+                        style={{ animationDelay: `${index * 50}ms` }}
+                        title={suggestion.purpose || ''}
+                      >
+                        <div className="flex flex-col items-center gap-2 text-center">
+                          <h3 className="font-medium text-xs mb-1 group-hover:text-primary transition-colors leading-tight">
+                            {suggestion.title ? suggestion.title : <span className="text-muted-foreground">No title</span>}
+                          </h3>
+                        </div>
+                      </Card>
+                    ))}
+              {suggestions.length > 12 && (
+                <div className="flex justify-center mt-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={() => setShowSuggestionHelp(true)}
-                    className="h-8 w-8 p-0 hover:bg-secondary/50"
+                    onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+                    className="text-xs hover:bg-secondary/50"
                   >
-                    <HelpCircle className="w-4 h-4" />
+                    {showAllSuggestions ? `Show Less` : `Show More Suggestions (${suggestions.length - 12} more)`}
                   </Button>
                 </div>
-
-                {/* Unified Suggestions Grid - All suggestions from backend API */}
-                <div className="flex justify-center w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 w-full max-w-5xl mx-auto">
-                    {isSuggestionsLoading
-                      ? Array.from({ length: 8 }).map((_, index) => (
-                          <Card key={`skeleton-${index}`} className="p-3 animate-pulse">
-                            <div className="flex flex-col items-center gap-2 text-center">
-                              <div className="w-8 h-8 bg-muted rounded-md flex-shrink-0"></div>
-                              <div className="flex-1 min-w-0 w-full">
-                                <div className="h-3 bg-muted rounded mb-1"></div>
-                                <div className="h-2 bg-muted/70 rounded w-3/4 mx-auto"></div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))
-                      : suggestions.slice(0, showAllSuggestions ? suggestions.length : 8).map((suggestion, index) => (
-                          <Card
-                            key={`suggestion-${index}`}
-                            className="p-3 cursor-pointer hover:bg-secondary/50 transition-all group suggestion-card interactive-hover ripple-effect fade-in-up"
-                            onClick={() => useSuggestion(suggestion.prompt)}
-                            style={{ animationDelay: `${index * 50}ms` }}
-                          >
-                            <div className="flex flex-col items-center gap-2 text-center">
-                              <div className={`p-2 rounded-md ${suggestion.color} flex-shrink-0`}>
-                                {/* Dynamic icon rendering based on suggestion.icon */}
-                                {suggestion.icon === 'BarChart3' && <BarChart3 className="w-4 h-4" />}
-                                {suggestion.icon === 'TrendingUp' && <TrendingUp className="w-4 h-4" />}
-                                {suggestion.icon === 'PieChart' && <PieChart className="w-4 h-4" />}
-                                {suggestion.icon === 'Target' && <Target className="w-4 h-4" />}
-                                {suggestion.icon === 'Zap' && <Zap className="w-4 h-4" />}
-                                {suggestion.icon === 'LayoutDashboard' && <LayoutDashboard className="w-4 h-4" />}
-                                {suggestion.icon === 'MessageSquare' && <MessageSquare className="w-4 h-4" />}
-                                {suggestion.icon === 'FileText' && <FileText className="w-4 h-4" />}
-                                {suggestion.icon === 'Users' && <Users className="w-4 h-4" />}
-                                {suggestion.icon === 'Database' && <Database className="w-4 h-4" />}
-                                {suggestion.icon === 'LineChart' && <LineChart className="w-4 h-4" />}
-                                {suggestion.icon === 'BarChart' && <BarChart className="w-4 h-4" />}
-                                {suggestion.icon === 'Activity' && <Activity className="w-4 h-4" />}
-                                {suggestion.icon === 'Cloud' && <Cloud className="w-4 h-4" />}
-                                {suggestion.icon === 'Grid3X3' && <Grid3X3 className="w-4 h-4" />}
-                                {/* Fallback icon for any suggestions without a mapped icon */}
-                                {!['BarChart3', 'TrendingUp', 'PieChart', 'Target', 'Zap', 'LayoutDashboard', 'MessageSquare', 'FileText', 'Users', 'Database', 'LineChart', 'BarChart', 'Activity', 'Cloud', 'Grid3X3'].includes(suggestion.icon) && 
-                                  <BarChart3 className="w-4 h-4" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-xs mb-1 group-hover:text-primary transition-colors leading-tight">
-                                  {suggestion.title}
-                                </h3>
-                                <span className="text-xs text-primary font-medium uppercase tracking-wide">
-                                  {suggestion.category}
-                                </span>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                  </div>
-                </div>
-
-                {/* Show More/Less Button for All Suggestions */}
-                {!showAllSuggestions && suggestions.length > 8 && (
-                  <div className="flex justify-center mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAllSuggestions(true)}
-                      className="text-xs hover:bg-secondary/50"
-                    >
-                      Show More Suggestions ({suggestions.length - 8} more)
-                    </Button>
-                  </div>
-                )}
-
-                {showAllSuggestions && suggestions.length > 8 && (
-                  <div className="flex justify-center mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAllSuggestions(false)}
-                      className="text-xs hover:bg-secondary/50"
-                    >
-                      Show Less
-                    </Button>
-                  </div>
-                )}
-
-                {/* Compact Suggestions Grid - Centered */}
-                <div className="flex justify-center w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 w-full max-w-3xl mx-auto">
-                    {isSuggestionsLoading
-                      ? Array.from({ length: 3 }).map((_, index) => (
-                          <Card key={`skeleton-${index}`} className="p-2 animate-pulse">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 bg-muted rounded-md flex-shrink-0"></div>
-                              <div className="flex-1 min-w-0">
-                                <div className="h-3 bg-muted rounded mb-1"></div>
-                                <div className="h-2 bg-muted/70 rounded w-3/4"></div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))
-                      : suggestions.slice(0, showAllSuggestions ? 8 : 3).map((suggestion, index) => (
-                          <Card
-                            key={index}
-                            className="p-2 cursor-pointer hover:bg-secondary/50 transition-all group suggestion-card interactive-hover ripple-effect fade-in-up"
-                            onClick={() => useSuggestion(suggestion.prompt)}
-                            style={{ animationDelay: `${index * 100}ms` }}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <div className={`p-1 rounded-md ${suggestion.color} flex-shrink-0`}>
-                                {suggestion.icon === 'BarChart3' && <BarChart3 className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'TrendingUp' && <TrendingUp className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'PieChart' && <PieChart className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'Target' && <Target className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'Zap' && <Zap className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'LayoutDashboard' && <LayoutDashboard className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'MessageSquare' && <MessageSquare className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'FileText' && <FileText className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'Users' && <Users className="w-2.5 h-2.5" />}
-                                {suggestion.icon === 'Database' && <Database className="w-2.5 h-2.5" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-xs mb-0.5 group-hover:text-primary transition-colors truncate leading-tight">
-                                  {suggestion.title}
-                                </h3>
-                                <span className="text-xs text-primary font-medium">
-                                  {suggestion.category}
-                                </span>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                  </div>
-                </div>
-
-                {/* Show More Button for Suggestions */}
-                {!showAllSuggestions && suggestions.length > 3 && (
-                  <div className="flex justify-center mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAllSuggestions(true)}
-                      className="text-xs hover:bg-secondary/50"
-                    >
-                      Show More Suggestions ({Math.min(suggestions.length - 3, 5)} more)
-                    </Button>
-                  </div>
-                )}
-
-                {/* Show Less Button for Suggestions */}
-                {showAllSuggestions && (
-                  <div className="flex justify-center mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAllSuggestions(false)}
-                      className="text-xs hover:bg-secondary/50"
-                    >
-                      Show Less
-                    </Button>
-                  </div>
-                )}
+              )}
+              <div className="flex justify-center mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSuggestionHelp(true)}
+                  className="h-8 w-8 p-0 hover:bg-secondary/50"
+                  title="Help"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </div>
+        )}
 
+        {/* Chat Area - always fills available space, leaves room for panel if open */}
+        <div
+          className="flex flex-col"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            maxWidth: '100%',
+            // Add right margin only when panel is open so chat area is not covered
+            marginRight: suggestionsDialogOpen ? '320px' : 0,
+            transition: 'margin-right 0.5s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
           {/* Messages Area */}
-          <div className="flex-1 relative overflow-y-auto p-4 space-y-6">
+          <div className="flex-1 relative overflow-y-auto p-4 pt-20 space-y-6">
             {/* Top Reference Point */}
             <div ref={messagesTopRef} />
+            {/* ...existing code for messages... */}
             {messages.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Start a conversation by asking a question or clicking on a topic above!</p>
@@ -793,7 +757,7 @@ export default function SimpleChatFixedPage() {
                       <div className="flex-1 min-w-0">
                         {message.role === "assistant" ? (
                           <div className="chat-message-text prose prose-sm max-w-none">
-                            {(typeof message.content === 'string' ? message.content : message.content?.message || String(message.content || '')).split('\n').map((line, index) => {
+                            {(typeof message.content === 'string' ? message.content : String(message.content || '')).split('\n').map((line: string, index: number) => {
                               if (line.trim() === '') return <br key={index} />;
                               return <p key={index} className="mb-2 leading-relaxed">{line}</p>;
                             })}
@@ -932,6 +896,7 @@ export default function SimpleChatFixedPage() {
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Suggestion Help Modal */}
