@@ -30,7 +30,7 @@ export default function DashboardMinimal() {
   });
 
   // Filter state
-  const [selectedTopic, setSelectedTopic] = useState("general");
+  const [selectedTopic, setSelectedTopic] = useState("shoprite");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Date range state
@@ -45,12 +45,22 @@ export default function DashboardMinimal() {
   // Default fallback structure to prevent null reference errors
   const defaultData = {
     metrics: {
-      activeStations: 0,
-      topTopic: "Loading...",
-      topStation: "Loading...",
-      topCampaign: 0,
-      highestSentimentCampaign: 0,
-      topPerformingTimeSlot: "Loading..."
+      overallPositiveSentiment: {
+        value: 0,
+        label: "Overall Positive Sentiment"
+      },
+      totalMentions: {
+        value: 0,
+        label: "Total On-Air Mentions"
+      },
+      highEngagementMoments: {
+        value: 0,
+        label: "High Engagement Moments"
+      },
+      whatsappNumberMentions: {
+        value: 0,
+        label: "WhatsApp Number Mentions"
+      }
     },
     charts: {}
   };
@@ -60,12 +70,22 @@ export default function DashboardMinimal() {
     const metrics = sourceData?.metrics || sourceData?.dashboard_metrics || sourceData?.dashboard?.metrics || {};
     return {
       metrics: {
-        activeStations: metrics.activeStations || metrics.active_stations || 0,
-        topTopic: metrics.topTopic || metrics.top_topic || "Loading...",
-        topStation: metrics.topStation || metrics.top_station || "Loading...",
-        topCampaign: metrics.topCampaign || metrics.top_campaign || 0,
-        highestSentimentCampaign: metrics.highestSentimentCampaign || metrics.highest_sentiment_campaign || 0,
-        topPerformingTimeSlot: metrics.topPerformingTimeSlot || metrics.top_performing_time_slot || "Loading..."
+        overallPositiveSentiment: metrics.overallPositiveSentiment || {
+          value: 0,
+          label: "Overall Positive Sentiment"
+        },
+        totalMentions: metrics.totalMentions || {
+          value: 0,
+          label: "Total On-Air Mentions"
+        },
+        highEngagementMoments: metrics.highEngagementMoments || {
+          value: 0,
+          label: "High Engagement Moments"
+        },
+        whatsappNumberMentions: metrics.whatsappNumberMentions || {
+          value: 0,
+          label: "WhatsApp Number Mentions"
+        }
       },
       charts: sourceData?.charts || sourceData?.dashboard?.charts || {}
     };
@@ -74,12 +94,120 @@ export default function DashboardMinimal() {
   try {
     const parsedData = DashboardSchema.parse(rawData);
     dashboardData = parsedData || createFallbackData(rawData);
+    console.log('✅ Schema validation passed:', dashboardData);
   } catch (err: any) {
     schemaError = err;
+    console.error('❌ Schema validation failed:', err);
+    console.log('🔍 Raw data structure:', rawData);
     dashboardData = createFallbackData(rawData);
+    console.log('🛠️ Using fallback data:', dashboardData);
   }
 
   const isDashboardLoading = state.isDashboardLoading;
+
+  // Normalize chart data to handle both old and new value formats
+  const normalizeChartData = (chart: any) => {
+    if (!chart || !chart.data) {
+      console.warn('🔧 Chart normalization: No chart or data found', chart);
+      return chart;
+    }
+    
+    try {
+      const normalizedChart = { ...chart };
+      
+      console.log('🔧 Normalizing chart:', chart.title, 'Original data:', chart.data);
+      
+      // Handle case where chart.data is an object (new backend format)
+      let dataArray = chart.data;
+      if (!Array.isArray(chart.data)) {
+        console.log('🔧 Chart data is not an array, converting:', chart.data);
+        if (typeof chart.data === 'object' && chart.data !== null) {
+          // If data is an object, convert it to array format
+          dataArray = Object.entries(chart.data).map(([key, value]) => ({
+            name: key,
+            value: typeof value === 'number' ? value : (typeof value === 'object' && value !== null && typeof (value as any).value === 'number') ? (value as any).value : 0,
+            label: key
+          }));
+        } else {
+          console.warn('🔧 Chart data is not a valid format:', chart.data);
+          dataArray = [];
+        }
+      }
+      
+      normalizedChart.data = dataArray.map((item: any, index: number) => {
+        const normalizedItem = { ...item };
+        
+        // Handle value field - convert object to number if needed
+        if (typeof item.value === 'object' && item.value !== null) {
+          console.log(`🔧 Converting object value at index ${index}:`, item.value);
+          normalizedItem.value = typeof item.value.value === 'number' ? item.value.value : 0;
+          // Preserve label if it exists
+          if (item.value.label) {
+            normalizedItem.label = item.value.label;
+          }
+        } else if (typeof item.value !== 'number') {
+          console.warn(`🔧 Non-numeric value at index ${index}:`, item.value, 'Converting to 0');
+          normalizedItem.value = 0;
+        }
+        
+        // Ensure name exists
+        if (!normalizedItem.name && normalizedItem.label) {
+          normalizedItem.name = normalizedItem.label;
+        }
+        if (!normalizedItem.name && !normalizedItem.label) {
+          normalizedItem.name = `Item ${index + 1}`;
+        }
+        
+        return normalizedItem;
+      });
+      
+      // Handle wordData if it exists
+      if (chart.wordData) {
+        console.log('🔧 Normalizing wordData:', chart.wordData);
+        normalizedChart.wordData = chart.wordData.map((word: any, index: number) => {
+          const normalizedWord = { ...word };
+          if (typeof word.value === 'object' && word.value !== null) {
+            normalizedWord.value = typeof word.value.value === 'number' ? word.value.value : 0;
+          } else if (typeof word.value !== 'number') {
+            console.warn(`🔧 Non-numeric wordData value at index ${index}:`, word.value);
+            normalizedWord.value = 0;
+          }
+          return normalizedWord;
+        });
+      }
+      
+      // Ensure required chart properties exist
+      if (!normalizedChart.xKey) normalizedChart.xKey = 'name';
+      if (!normalizedChart.yKey) normalizedChart.yKey = 'value';
+      
+      // Handle both 'type' and 'chart_type' fields for compatibility
+      if (!normalizedChart.type && normalizedChart.chart_type) {
+        normalizedChart.type = normalizedChart.chart_type;
+      }
+      if (!normalizedChart.type) normalizedChart.type = 'bar';
+      
+      // Ensure title exists - preserve existing title or generate one
+      if (!normalizedChart.title) {
+        const chartType = normalizedChart.type || 'chart';
+        normalizedChart.title = `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`;
+      }
+      
+      console.log('🔧 Normalized chart data:', normalizedChart.data);
+      return normalizedChart;
+      
+    } catch (error) {
+      console.error('🔧 Error normalizing chart data:', error, 'Chart:', chart);
+      // Return a safe fallback
+      return {
+        ...chart,
+        data: [{ name: 'No Data', value: 0 }],
+        xKey: 'name',
+        yKey: 'value',
+        type: chart?.type || chart?.chart_type || 'bar',
+        title: chart?.title || `${(chart?.type || chart?.chart_type || 'chart').charAt(0).toUpperCase() + (chart?.type || chart?.chart_type || 'chart').slice(1)} Chart`
+      };
+    }
+  };
 
   useEffect(() => {
     // Debug: Log current dashboard state
@@ -198,7 +326,7 @@ export default function DashboardMinimal() {
         dataPoint: data,
         chartType: data.chartType || type,
         chartTitle: data.chartTitle || title,
-        topic: selectedTopic !== 'general' ? selectedTopic : undefined
+        topic: selectedTopic // Always send the selected topic
       }),
     });
 
@@ -217,7 +345,7 @@ export default function DashboardMinimal() {
         metricType: data.metricType,
         metricTitle: data.metricTitle,
         metricValue: data.metricValue,
-        topic: selectedTopic !== 'general' ? selectedTopic : undefined
+        topic: selectedTopic // Always send the selected topic
       }),
     });
 
@@ -290,7 +418,8 @@ export default function DashboardMinimal() {
     const availableCharts = Object.entries(chartsData)
       .filter(([key, chart]) => {
         const c = chart as any;
-        return c && c.data && Array.isArray(c.data) && c.data.length > 0;
+        const normalizedChart = normalizeChartData(c);
+        return normalizedChart && normalizedChart.data && Array.isArray(normalizedChart.data) && normalizedChart.data.length > 0;
       })
       .map(([key, chart]) => ({ key, chart: chart as import("@/schemas/dashboardSchema").ChartData }));
 
@@ -329,35 +458,57 @@ export default function DashboardMinimal() {
 
     return (
       <div className={`grid ${gridLayout} gap-4 sm:gap-6 mb-6 sm:mb-8`}>
-        {availableCharts.map(({ key, chart }) => (
-          <div key={key} className="p-4 sm:p-6 bg-card border border-border rounded-lg">
-            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{chart.title}</h3>
-            <ChartRenderer
-              chartData={chart}
-              onChartClick={(dataPoint, chartType, chartTitle) => {
-                setDrillDownModal({
-                  isOpen: true,
-                  data: { ...dataPoint, chartType, chartTitle },
-                  title: `Chart Analysis: ${dataPoint?.label || dataPoint?.category || 'Data Point'}`,
-                  subtitle: "Interactive chart drilling with detailed radio transcript analysis from OpenAI assistant",
-                  type: 'chart',
-                  fields: [
-                    { label: 'Chart Type', value: chartType, key: 'chartType' },
-                    { label: 'Value', value: dataPoint?.value || 'N/A', key: 'value' },
-                    { label: 'Label', value: dataPoint?.label || dataPoint?.category || 'Unknown', key: 'label' }
-                  ]
-                });
-              }}
-            />
-            {chart.insights && (
-              <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  <span className="font-medium">AI Insight:</span> {chart.insights}
-                </p>
+        {availableCharts.map(({ key, chart }) => {
+          try {
+            const normalizedChart = normalizeChartData(chart);
+            console.log(`🔧 Rendering chart ${key}:`, normalizedChart);
+            
+            return (
+              <div key={key} className="p-4 sm:p-6 bg-card border border-border rounded-lg">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{normalizedChart.title}</h3>
+                <div className="chart-container">
+                  <ChartRenderer
+                    chartData={normalizedChart}
+                    onChartClick={(dataPoint, chartType, chartTitle) => {
+                      setDrillDownModal({
+                        isOpen: true,
+                        data: { ...dataPoint, chartType, chartTitle },
+                        title: `Chart Analysis: ${dataPoint?.label || dataPoint?.category || 'Data Point'}`,
+                        subtitle: "Interactive chart drilling with detailed radio transcript analysis from OpenAI assistant",
+                        type: 'chart',
+                        fields: [
+                          { label: 'Chart Type', value: chartType, key: 'chartType' },
+                          { label: 'Value', value: dataPoint?.value || 'N/A', key: 'value' },
+                          { label: 'Label', value: dataPoint?.label || dataPoint?.category || 'Unknown', key: 'label' }
+                        ]
+                      });
+                    }}
+                  />
+                </div>
+                {normalizedChart.insights && (
+                  <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      <span className="font-medium">AI Insight:</span> {normalizedChart.insights}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          } catch (error) {
+            console.error(`🔧 Error rendering chart ${key}:`, error, 'Chart data:', chart);
+            return (
+              <div key={key} className="p-4 sm:p-6 bg-card border border-border rounded-lg">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{chart?.title || 'Chart Error'}</h3>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-sm">Error rendering chart</p>
+                    <p className="text-xs text-destructive mt-1">Check console for details</p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        })}
       </div>
     );
   };
@@ -434,13 +585,13 @@ export default function DashboardMinimal() {
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 disabled={isDashboardLoading}
-                title="Filter dashboard content by specific topics like Shoprite, Telkom, ANC, or view all general content"
+                title="Filter dashboard content by specific topics like Shoprite (default), Telkom, ANC, or view all general content"
                 className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors ${
                   isDashboardLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 <Filter className="w-4 h-4" />
-                <span>{topicsData.find(topic => topic.value === selectedTopic)?.label || "General"}</span>
+                <span>{topicsData.find(topic => topic.value === selectedTopic)?.label || "Shoprite"}</span>
                 {isDashboardLoading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                 ) : (
@@ -517,83 +668,57 @@ export default function DashboardMinimal() {
           </div>
         )}
 
-        {/* Radio Analytics Metrics - All 6 metrics in compact grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        {/* Radio Analytics Metrics - All 4 metrics in compact grid */}
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("active_stations", "Active Stations", dashboardData.metrics.activeStations.toString())}
-            title="Click to drill down into active radio stations analysis with detailed AI insights about station performance and coverage"
+            onClick={() => handleMetricClick("overall_positive_sentiment", dashboardData.metrics?.overallPositiveSentiment?.label || "Overall Positive Sentiment", (dashboardData.metrics?.overallPositiveSentiment?.value || 0).toString())}
+            title="Click to drill down into overall positive sentiment analysis with detailed AI insights about sentiment trends and patterns"
+          >
+            <div className="flex flex-col items-center text-center space-y-1">
+              <TrendingUp className="h-4 w-4 text-green-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">{dashboardData.metrics?.overallPositiveSentiment?.label || "Overall Positive Sentiment"}</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics?.overallPositiveSentiment?.value || 0}%</p>
+              <p className="text-xs text-muted-foreground">Positive</p>
+            </div>
+          </div>
+
+          <div 
+            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
+            onClick={() => handleMetricClick("total_mentions", dashboardData.metrics?.totalMentions?.label || "Total On-Air Mentions", (dashboardData.metrics?.totalMentions?.value || 0).toString())}
+            title="Click to analyze total on-air mentions with AI-powered insights into mention frequency and context patterns"
           >
             <div className="flex flex-col items-center text-center space-y-1">
               <Radio className="h-4 w-4 text-blue-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Active Stations</p>
-              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.activeStations}</p>
-              <p className="text-xs text-muted-foreground">Monitored</p>
+              <p className="text-xs font-medium text-muted-foreground">{dashboardData.metrics?.totalMentions?.label || "Total On-Air Mentions"}</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics?.totalMentions?.value || 0}</p>
+              <p className="text-xs text-muted-foreground">Mentions</p>
             </div>
           </div>
 
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("top_topic", "Top Topic", dashboardData.metrics.topTopic)}
-            title="Click to analyze the most discussed topic with AI-powered insights into conversation trends and sentiment patterns"
+            onClick={() => handleMetricClick("high_engagement_moments", dashboardData.metrics?.highEngagementMoments?.label || "High Engagement Moments", (dashboardData.metrics?.highEngagementMoments?.value || 0).toString())}
+            title="Click to explore high engagement moments with detailed analytics about audience participation and broadcast patterns"
           >
             <div className="flex flex-col items-center text-center space-y-1">
-              <TrendingUp className="h-4 w-4 text-orange-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Top Topic</p>
-              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topTopic}</p>
-              <p className="text-xs text-muted-foreground">Discussed</p>
+              <Zap className="h-4 w-4 text-yellow-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">{dashboardData.metrics?.highEngagementMoments?.label || "High Engagement Moments"}</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics?.highEngagementMoments?.value || 0}</p>
+              <p className="text-xs text-muted-foreground">Moments</p>
             </div>
           </div>
 
           <div 
             className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("top_station", "Top Station", dashboardData.metrics.topStation)}
-            title="Click to explore the most active radio station with detailed analytics about content, audience engagement, and broadcast patterns"
+            onClick={() => handleMetricClick("whatsapp_number_mentions", dashboardData.metrics?.whatsappNumberMentions?.label || "WhatsApp Number Mentions", (dashboardData.metrics?.whatsappNumberMentions?.value || 0).toString())}
+            title="Click to analyze WhatsApp number mentions with AI insights into call-to-action effectiveness and audience response patterns"
           >
             <div className="flex flex-col items-center text-center space-y-1">
-              <Target className="h-4 w-4 text-purple-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Top Station</p>
-              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topStation}</p>
-              <p className="text-xs text-muted-foreground">Active</p>
-            </div>
-          </div>
-
-          <div 
-            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("top_campaign", "Top Campaign", dashboardData.metrics.topCampaign.toString())}
-            title="Click to analyze the highest reaching campaign with AI insights into effectiveness, audience impact, and content strategy"
-          >
-            <div className="flex flex-col items-center text-center space-y-1">
-              <BarChart3 className="h-4 w-4 text-indigo-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Top Campaign</p>
-              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.topCampaign}</p>
-              <p className="text-xs text-muted-foreground">Reach</p>
-            </div>
-          </div>
-
-          <div 
-            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("highest_sentiment_campaign", "Best Sentiment", dashboardData.metrics.highestSentimentCampaign.toString())}
-            title="Click to dive deep into the campaign with the highest positive sentiment score and understand what makes content resonate with audiences"
-          >
-            <div className="flex flex-col items-center text-center space-y-1">
-              <Award className="h-4 w-4 text-yellow-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Best Sentiment</p>
-              <p className="text-lg font-bold text-foreground">{dashboardData.metrics.highestSentimentCampaign}%</p>
-              <p className="text-xs text-muted-foreground">Score</p>
-            </div>
-          </div>
-
-          <div 
-            className="p-4 bg-card border border-border rounded-lg cursor-pointer hover:bg-accent/50 hover:scale-[1.02] transition-all duration-200 shadow-sm" 
-            onClick={() => handleMetricClick("top_performing_time_slot", "Peak Time Slot", dashboardData.metrics.topPerformingTimeSlot)}
-            title="Click to analyze the peak performance time slot with insights into audience behavior, content effectiveness, and optimal scheduling strategies"
-          >
-            <div className="flex flex-col items-center text-center space-y-1">
-              <Clock className="h-4 w-4 text-red-500 mb-1" />
-              <p className="text-xs font-medium text-muted-foreground">Peak Time</p>
-              <p className="text-sm font-bold text-foreground truncate max-w-full">{dashboardData.metrics.topPerformingTimeSlot}</p>
-              <p className="text-xs text-muted-foreground">Slot</p>
+              <Activity className="h-4 w-4 text-purple-500 mb-1" />
+              <p className="text-xs font-medium text-muted-foreground">{dashboardData.metrics?.whatsappNumberMentions?.label || "WhatsApp Number Mentions"}</p>
+              <p className="text-lg font-bold text-foreground">{dashboardData.metrics?.whatsappNumberMentions?.value || 0}</p>
+              <p className="text-xs text-muted-foreground">WhatsApp</p>
             </div>
           </div>
         </div>

@@ -36,13 +36,31 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
   // Validate chart data
   const validateChartData = (data: ChartData): string | null => {
     if (!data) return "Chart data is missing";
-    if (!data.type) return "Chart type is not specified";
-    if (!data.title) return "Chart title is missing";
-    if (!data.data || !Array.isArray(data.data)) return "Chart data array is missing or invalid";
-    if (data.data.length === 0) return "Chart data is empty";
+    
+    // Check for chart type - accept both 'type' and 'chart_type' fields
+    const chartType = data.type || (data as any).chart_type;
+    if (!chartType) return "Chart type is not specified";
+    
+    // Title is optional - we can generate one if missing
+    // if (!data.title) return "Chart title is missing";
+    
+    // Handle both array and object data formats
+    if (!data.data) return "Chart data is missing";
+    
+    // For array format
+    if (Array.isArray(data.data)) {
+      if (data.data.length === 0) return "Chart data is empty";
+    } 
+    // For object format (from new backend)
+    else if (typeof data.data === 'object') {
+      if (Object.keys(data.data).length === 0) return "Chart data is empty";
+    } 
+    else {
+      return "Chart data format is invalid";
+    }
     
     // Validate data structure based on chart type
-    if (data.type === 'wordcloud') {
+    if (chartType === 'wordcloud') {
       if (!data.wordData || !Array.isArray(data.wordData)) {
         return "Word cloud data is missing or invalid";
       }
@@ -118,7 +136,12 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
   }
 
   try {
-    const { type, title, data, xKey, yKey } = chartData;
+    // Handle both specific chart format (chart_type) and generic format (type)
+    const chartType = chartData.type || (chartData as any).chart_type;
+    const chartTitle = chartData.title || `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`;
+    const chartDataArray = chartData.data;
+    const { xKey, yKey } = chartData;
+    
     const { theme } = useTheme();
     const baseColors = getChartColors();
   
@@ -126,7 +149,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   // Ensure data exists and is an array
-  if (!data || !Array.isArray(data) || data.length === 0) {
+  if (!chartDataArray || !Array.isArray(chartDataArray) || chartDataArray.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
         <div className="text-center">
@@ -140,7 +163,17 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
   // Function to safely get values from data
   const getValue = (item: any, key: string | undefined, fallback: any = 0) => {
     if (!item || typeof item !== 'object') return fallback;
-    return item[key || ''] ?? item.value ?? fallback;
+    
+    let value = item[key || ''] ?? item.value ?? fallback;
+    
+    // Handle nested object values (new format)
+    if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
+      return value.value;
+    }
+    
+    // Ensure we always return a number
+    const numValue = Number(value);
+    return isNaN(numValue) ? fallback : numValue;
   };
 
   const getName = (item: any, fallback: string = 'Unknown') => {
@@ -148,8 +181,22 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     return item.name ?? item.label ?? item.category ?? fallback;
   };
   
+  // Helper function to safely extract numeric values for charts
+  const safeNumericValue = (value: any, fallback: number = 0): number => {
+    if (typeof value === 'number' && !isNaN(value)) return value;
+    if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
+      return value.value;
+    }
+    const numValue = Number(value);
+    if (isNaN(numValue)) {
+      console.warn('🔧 Invalid numeric value:', value, 'Using fallback:', fallback);
+      return fallback;
+    }
+    return numValue;
+  };
+  
   // Extract values for dynamic coloring (after getValue function is defined)
-  const values = data.map(item => getValue(item, yKey, 0));
+  const values = chartDataArray.map(item => getValue(item, yKey, 0));
   const dynamicColors = generateValueBasedColors(values);
   const { colors: gradientColors, gradients } = generateGradientColors(values);
 
@@ -167,7 +214,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
               label: config.w.globals.labels[config.dataPointIndex],
               category: config.w.config.xaxis.categories ? config.w.config.xaxis.categories[config.dataPointIndex] : null
             };
-            onChartClick(dataPoint, type, title || 'Chart');
+            onChartClick(dataPoint, chartType, chartTitle || 'Chart');
           }
         }
       },
@@ -186,13 +233,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         },
         export: {
           csv: {
-            filename: title || 'chart-data'
+            filename: chartTitle || 'chart-data'
           },
           svg: {
-            filename: title || 'chart'
+            filename: chartTitle || 'chart'
           },
           png: {
-            filename: title || 'chart'
+            filename: chartTitle || 'chart'
           }
         }
       },
@@ -224,15 +271,27 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     }
   };
 
-  // Prepare chart data
-  const processedData = data.map((item: any, index: number) => ({
-    name: getName(item, `Item ${index + 1}`),
-    value: Number(getValue(item, yKey || 'value', 0)) || 0,
-    x: getValue(item, xKey || 'name', getName(item, `Item ${index + 1}`)),
-    y: Number(getValue(item, yKey || 'value', 0)) || 0
-  }));
+  // Prepare chart data with enhanced error checking
+  const processedData = chartDataArray.map((item: any, index: number) => {
+    const name = getName(item, `Item ${index + 1}`);
+    const value = safeNumericValue(getValue(item, yKey || 'value', 0));
+    
+    console.log(`🔧 Processing chart data item ${index}:`, {
+      original: item,
+      name,
+      value,
+      type: typeof value
+    });
+    
+    return {
+      name,
+      value,
+      x: getValue(item, xKey || 'name', name),
+      y: value
+    };
+  });
 
-  switch (type) {
+  switch (chartType) {
     case "bar":
       const barOptions = {
         ...baseConfig,
@@ -250,7 +309,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.xaxis.categories[config.dataPointIndex],
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'bar', title || 'Bar Chart');
+                onChartClick(dataPoint, 'bar', chartTitle || 'Bar Chart');
               }
             }
           }
@@ -299,12 +358,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         title: {
-          text: '', // Remove internal title to prevent overlap
+          text: chartTitle,
           style: {
             fontSize: '16px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
           },
-          margin: 0
+          margin: 10
         },
         legend: {
           show: false // Hide legend for distributed bars
@@ -321,10 +381,23 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
 
       const barSeries = [{
         name: 'Values',
-        data: processedData.map(item => item.value)
+        data: processedData.map(item => {
+          const value = Number(item.value);
+          if (isNaN(value)) {
+            console.warn('🔧 Invalid bar chart value:', item.value, 'Converting to 0');
+            return 0;
+          }
+          return value;
+        })
       }];
 
-      return <Chart options={barOptions} series={barSeries} type="bar" height={520} />;
+      try {
+        return <Chart options={barOptions} series={barSeries} type="bar" height={520} />;
+      } catch (chartError) {
+        console.error('🔧 ApexCharts bar chart error:', chartError, 'Data:', barSeries);
+        handleChartError(`Bar chart rendering failed: ${chartError}`);
+        return null;
+      }
 
     case "line":
       const lineOptions = {
@@ -344,7 +417,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
                 console.log('Line chart calling onChartClick with:', dataPoint);
-                onChartClick(dataPoint, 'line', title || 'Line Chart');
+                onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
               }
             },
             markerClick: function(event: any, chartContext: any, config: any) {
@@ -357,7 +430,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.xaxis.categories[config.dataPointIndex],
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'line', title || 'Line Chart');
+                onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
               }
             }
           }
@@ -381,12 +454,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         title: {
-          text: '', // Remove internal title to prevent overlap
+          text: chartTitle,
           style: {
             fontSize: '16px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
           },
-          margin: 0
+          margin: 10
         },
         grid: {
           padding: {
@@ -439,6 +513,152 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
 
       return <Chart options={lineOptions} series={lineSeries} type="line" height={520} />;
 
+    case "donut":
+      const donutOptions = {
+        ...baseConfig,
+        chart: {
+          ...baseConfig.chart,
+          type: 'donut' as const,
+          width: '100%',
+          height: 450,
+          events: {
+            ...baseConfig.chart.events,
+            dataPointSelection: function(event: any, chartContext: any, config: any) {
+              if (onChartClick) {
+                const dataPoint = {
+                  seriesIndex: 0,
+                  dataPointIndex: config.dataPointIndex,
+                  value: config.w.config.series[config.dataPointIndex],
+                  label: config.w.config.labels[config.dataPointIndex],
+                  category: config.w.config.labels[config.dataPointIndex]
+                };
+                onChartClick(dataPoint, 'donut', chartTitle || 'Donut Chart');
+              }
+            }
+          }
+        },
+        colors: dynamicColors, // Apply dynamic colors to each donut segment
+        fill: {
+          colors: dynamicColors,
+          opacity: 0.9,
+          type: 'gradient',
+          gradient: {
+            shade: 'light',
+            type: 'radial',
+            shadeIntensity: 0.4,
+            gradientToColors: gradientColors,
+            inverseColors: false,
+            opacityFrom: 1,
+            opacityTo: 0.8,
+            stops: [0, 100]
+          }
+        },
+        labels: processedData.map(item => item.name),
+        title: {
+          text: chartTitle,
+          align: 'center' as const,
+          margin: 15,
+          offsetX: 0,
+          offsetY: 0,
+          floating: false,
+          style: {
+            fontSize: '16px',
+            fontWeight: '600',
+            color: isDark ? '#ffffff' : '#333333'
+          }
+        },
+        legend: {
+          position: 'bottom' as const,
+          horizontalAlign: 'center' as const,
+          floating: false,
+          fontSize: '14px'
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function(val: number) {
+            return Math.round(val * 100) / 100 + "%";
+          }
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '65%',
+              labels: {
+                show: true,
+                name: {
+                  show: true,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: isDark ? '#ffffff' : '#333333',
+                  offsetY: -10,
+                },
+                value: {
+                  show: true,
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDark ? '#ffffff' : '#333333',
+                  offsetY: 5,
+                  formatter: function (val: string) {
+                    return Math.round(parseFloat(val) * 100) / 100 + "%";
+                  }
+                },
+                total: {
+                  show: true,
+                  showAlways: false,
+                  label: 'Total',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: isDark ? '#ffffff' : '#333333',
+                  formatter: function (w: any) {
+                    return w.globals.seriesTotals.reduce((a: number, b: number) => {
+                      return a + b;
+                    }, 0) + "%";
+                  }
+                }
+              }
+            }
+          }
+        },
+        responsive: [
+          {
+            breakpoint: 1280,
+            options: {
+              chart: { width: '100%', height: 320 },
+              legend: { position: 'bottom' as const },
+            },
+          },
+          {
+            breakpoint: 900,
+            options: {
+              chart: { width: '100%', height: 260 },
+              legend: { position: 'bottom' as const },
+            },
+          },
+          {
+            breakpoint: 600,
+            options: {
+              chart: { width: '100%', height: 200 },
+              legend: { position: 'bottom' as const },
+            },
+          },
+          {
+            breakpoint: 480,
+            options: {
+              chart: { width: 320 },
+              legend: { position: 'bottom' as const },
+            },
+          },
+        ]
+      };
+
+      const donutData = processedData.map(item => item.value);
+
+      return (
+        <div style={{ width: '100%', maxWidth: 640, minHeight: 420, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Chart options={donutOptions} series={donutData} type="donut" height={420} width={"100%"} />
+        </div>
+      );
+
     case "pie":
       const pieOptions = {
         ...baseConfig,
@@ -458,7 +678,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.labels[config.dataPointIndex],
                   category: config.w.config.labels[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'pie', title || 'Pie Chart');
+                onChartClick(dataPoint, 'pie', chartTitle || 'Pie Chart');
               }
             }
           }
@@ -481,14 +701,14 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         },
         labels: processedData.map(item => item.name),
         title: {
-          text: '', // Remove internal title to prevent overlap
+          text: chartTitle,
           align: 'center' as const,
-          margin: 0,
+          margin: 15,
           offsetX: 0,
           offsetY: 0,
           floating: false,
           style: {
-            fontSize: '14px',
+            fontSize: '16px',
             fontWeight: '600',
             color: isDark ? '#ffffff' : '#333333'
           }
@@ -562,7 +782,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.xaxis.categories[config.dataPointIndex],
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'area', title || 'Area Chart');
+                onChartClick(dataPoint, 'area', chartTitle || 'Area Chart');
               }
             }
           }
@@ -586,12 +806,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         title: {
-          text: '', // Remove internal title to prevent overlap
+          text: chartTitle,
           style: {
             fontSize: '16px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
           },
-          margin: 0
+          margin: 10
         },
         grid: {
           padding: {
@@ -637,7 +858,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   x: config.w.config.series[config.seriesIndex].data[config.dataPointIndex][0],
                   y: config.w.config.series[config.seriesIndex].data[config.dataPointIndex][1]
                 };
-                onChartClick(dataPoint, 'scatter', title || 'Scatter Plot');
+                onChartClick(dataPoint, 'scatter', chartTitle || 'Scatter Plot');
               }
             }
           }
@@ -655,7 +876,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         title: {
-          text: '' // Remove internal title to prevent overlap
+          text: chartTitle,
+          style: {
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
+          },
+          margin: 10
         },
         xaxis: {
           title: {
@@ -694,13 +921,19 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.xaxis.categories[config.dataPointIndex],
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'radar', title || 'Radar Chart');
+                onChartClick(dataPoint, 'radar', chartTitle || 'Radar Chart');
               }
             }
           }
         },
         title: {
-          text: '' // Remove internal title to prevent overlap
+          text: chartTitle,
+          style: {
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
+          },
+          margin: 10
         },
         xaxis: {
           categories: processedData.map(item => item.name)
@@ -745,13 +978,19 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   )
                 };
                 console.log('Heatmap drill-down data:', dataPoint);
-                onChartClick(dataPoint, 'heatmap', title || 'Heatmap Analysis');
+                onChartClick(dataPoint, 'heatmap', chartTitle || 'Heatmap Analysis');
               }
             }
           }
         },
         title: {
-          text: '' // Remove internal title to prevent overlap
+          text: chartTitle,
+          style: {
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
+          },
+          margin: 10
         },
         dataLabels: {
           enabled: true,
@@ -861,13 +1100,19 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   x: selectedData.x,
                   y: selectedData.y
                 };
-                onChartClick(dataPoint, 'treemap', title || 'Treemap Chart');
+                onChartClick(dataPoint, 'treemap', chartTitle || 'Treemap Chart');
               }
             }
           }
         },
         title: {
-          text: '' // Remove internal title to prevent overlap
+          text: chartTitle,
+          style: {
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
+          },
+          margin: 10
         },
         dataLabels: {
           enabled: true,
@@ -926,7 +1171,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                   label: config.w.config.xaxis.categories[config.dataPointIndex],
                   category: config.w.config.xaxis.categories[config.dataPointIndex]
                 };
-                onChartClick(dataPoint, 'funnel', title || 'Funnel Chart');
+                onChartClick(dataPoint, 'funnel', chartTitle || 'Funnel Chart');
               }
             }
           }
@@ -949,7 +1194,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         title: {
-          text: '' // Remove internal title to prevent overlap
+          text: chartTitle,
+          style: {
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: isDark ? '#ffffff' : '#333333'
+          },
+          margin: 10
         },
         xaxis: {
           categories: processedData.map(item => item.name)
@@ -973,7 +1224,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
 
       return (
         <div className="word-cloud-container h-[420px] p-6 border rounded-xl bg-muted/20">
-          <h3 className="text-xl font-semibold text-center mb-6">{title || 'Word Cloud'}</h3>
+          <h3 className="text-xl font-semibold text-center mb-6">{chartTitle || 'Word Cloud'}</h3>
           <div className="flex flex-wrap gap-3 justify-center items-center h-[340px] overflow-y-auto">
             {wordCloudData.map((word: any, index: number) => {
               const size = Math.max(16, Math.min(44, (word.value / Math.max(...wordCloudData.map((w: any) => w.value))) * 28 + 16));
@@ -996,7 +1247,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
                         seriesIndex: 0,
                         dataPointIndex: index
                       };
-                      onChartClick(dataPoint, 'wordcloud', title || 'Word Cloud');
+                      onChartClick(dataPoint, 'wordcloud', chartTitle || 'Word Cloud');
                     }
                   }}
                 >
@@ -1012,8 +1263,9 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       return (
         <div className="flex items-center justify-center h-64 text-gray-500">
           <div className="text-center">
-            <p className="text-lg font-medium">Chart type: {type}</p>
+            <p className="text-lg font-medium">Chart type: {chartType}</p>
             <p className="text-sm mt-1">ApexCharts visualization</p>
+            <p className="text-xs mt-2 text-muted-foreground">{chartTitle}</p>
           </div>
         </div>
       );

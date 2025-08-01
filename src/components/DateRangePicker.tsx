@@ -201,11 +201,11 @@ export default function DateRangePicker({ selectedRange, onRangeChange, disabled
   );
 }
 
-// Helper function to get default range (last week)
+// Helper function to get default range (last 31 days)
 export const getDefaultDateRange = (): DateRange => {
   return {
-    from: subDays(new Date(), 7),
+    from: subDays(new Date(), 31),
     to: new Date(),
-    label: 'Last 7 Days'
+    label: 'Last 31 Days'
   };
 };

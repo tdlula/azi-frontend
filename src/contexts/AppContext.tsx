@@ -19,12 +19,22 @@ interface Conversation {
 
 interface DashboardData {
   metrics: {
-    activeStations: number;
-    topTopic: string;
-    topStation: string;
-    topCampaign: number;
-    highestSentimentCampaign: number;
-    topPerformingTimeSlot: string;
+    overallPositiveSentiment: {
+      value: number;
+      label: string;
+    };
+    totalMentions: {
+      value: number;
+      label: string;
+    };
+    highEngagementMoments: {
+      value: number;
+      label: string;
+    };
+    whatsappNumberMentions: {
+      value: number;
+      label: string;
+    };
   };
   charts: {
     [key: string]: any; // Dynamic charts from OpenAI

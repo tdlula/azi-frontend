@@ -5,7 +5,13 @@ export const ChartDataSchema = z.object({
   title: z.string(),
   data: z.array(z.object({
     name: z.string(),
-    value: z.number(),
+    value: z.union([
+      z.number(), // Support legacy simple number format
+      z.object({   // Support new nested object format
+        value: z.number(),
+        label: z.string()
+      })
+    ]),
   }).catchall(z.any())),
   xKey: z.string(),
   yKey: z.string(),
@@ -15,7 +21,13 @@ export const ChartDataSchema = z.object({
   caption: z.string().optional(),
   wordData: z.array(z.object({
     text: z.string(),
-    value: z.number(),
+    value: z.union([
+      z.number(), // Support legacy simple number format
+      z.object({   // Support new nested object format
+        value: z.number(),
+        label: z.string()
+      })
+    ]),
     category: z.string(),
     sentiment: z.string(),
   })).optional(),
@@ -35,12 +47,22 @@ export const ChartDataSchema = z.object({
  * and provide comprehensive radio performance analytics
  */
 export const DashboardMetricsSchema = z.object({
-  activeStations: z.number(),           // Number of unique radio stations active in last 30 days
-  topTopic: z.string(),                 // Most discussed topic across all radio segments
-  topStation: z.string(),               // Radio station with highest number of segments/mentions
-  topCampaign: z.number(),              // Campaign with highest audience reach
-  highestSentimentCampaign: z.number(), // Campaign with most positive sentiment score
-  topPerformingTimeSlot: z.string(),    // Time slot with highest audience reach
+  overallPositiveSentiment: z.object({
+    value: z.number(),
+    label: z.string()
+  }),
+  totalMentions: z.object({
+    value: z.number(),
+    label: z.string()
+  }),
+  highEngagementMoments: z.object({
+    value: z.number(),
+    label: z.string()
+  }),
+  whatsappNumberMentions: z.object({
+    value: z.number(),
+    label: z.string()
+  })
 });
 
 export const DashboardSchema = z.object({
