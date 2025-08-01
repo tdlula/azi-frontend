@@ -1,11 +1,13 @@
-import { TrendingUp, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap, Settings, Info } from "lucide-react";
+import { TrendingUp, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap, Settings, Info, FileText } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import ChartRenderer from "@/components/charts/ChartRenderer";
 import DrillDownModal from "@/components/modals/DrillDownModal";
 import DashboardStatus from "@/components/DashboardStatus";
 import DateRangePicker, { getDefaultDateRange } from "@/components/DateRangePicker";
-import { useState, useEffect } from "react";
+import ReportGenerator from "@/components/ReportGenerator";
+import { exportToPDF } from "@/utils/pdfExport";
+import { useState, useEffect, useRef } from "react";
 import { DashboardSchema } from "@/schemas/dashboardSchema";
 import html2canvas from "html2canvas";
 import { useAppContext } from "@/contexts/AppContext";
@@ -19,14 +21,23 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 export default function DashboardMinimal() {
   const { state, loadDashboardData, loadWordCloudData } = useAppContext();
   const { isAdminEnabled } = useAppConfig();
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
-  const [drillDownModal, setDrillDownModal] = useState({
+  const [drillDownModal, setDrillDownModal] = useState<{
+    isOpen: boolean;
+    data: any;
+    title: string;
+    subtitle: string;
+    type: 'chart' | 'metrics';
+    fields: Array<{ label: string; value: string | number; key: string }>;
+  }>({
     isOpen: false,
     data: null,
     title: "",
     subtitle: "",
-    type: 'chart' as 'chart' | 'metrics',
-    fields: [] as Array<{ label: string; value: string | number; key: string }>
+    type: 'chart',
+    fields: []
   });
 
   // Filter state
@@ -317,6 +328,338 @@ export default function DashboardMinimal() {
     }
   };
 
+  const generateReport = async () => {
+    if (isGeneratingReport) return;
+    
+    try {
+      setIsGeneratingReport(true);
+      
+      // Prepare report data
+      const reportData = {
+        metrics: dashboardData.metrics || {},
+        charts: dashboardData.charts || {},
+        wordCloudData: state.wordCloudData,
+        dateRange: selectedDateRange,
+        selectedTopic,
+        topicLabel: topicsData.find(t => t.value === selectedTopic)?.label || 'General'
+      };
+
+      // Create filename
+      const filename = `radio-analytics-report-${selectedTopic}-${selectedDateRange.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Open report in new window for PDF generation
+      const reportWindow = window.open('', '_blank', 'width=1200,height=800');
+      if (!reportWindow) {
+        throw new Error('Failed to open report window. Please allow popups for this site.');
+      }
+
+      // Generate report HTML
+      const reportHTML = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Radio Analytics Report</title>
+            <meta charset="utf-8">
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: white; 
+                color: black; 
+                line-height: 1.6;
+                padding: 40px;
+              }
+              .header { 
+                text-align: center; 
+                border-bottom: 2px solid #e5e5e5; 
+                padding-bottom: 30px; 
+                margin-bottom: 40px; 
+              }
+              .header h1 { 
+                font-size: 2.5rem; 
+                font-weight: bold; 
+                color: #1f2937; 
+                margin-bottom: 10px; 
+              }
+              .header h2 { 
+                font-size: 1.5rem; 
+                font-weight: 600; 
+                color: #4b5563; 
+                margin-bottom: 20px; 
+              }
+              .header-info { 
+                display: flex; 
+                justify-content: center; 
+                gap: 30px; 
+                font-size: 0.9rem; 
+                color: #6b7280; 
+              }
+              .section { 
+                margin-bottom: 40px; 
+              }
+              .section-title { 
+                font-size: 1.5rem; 
+                font-weight: bold; 
+                color: #1f2937; 
+                margin-bottom: 20px; 
+                display: flex; 
+                align-items: center; 
+                gap: 10px; 
+              }
+              .metrics-grid { 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+                gap: 20px; 
+                margin-bottom: 30px; 
+              }
+              .metric-card { 
+                background: #f9fafb; 
+                border: 2px solid #e5e7eb; 
+                border-radius: 8px; 
+                padding: 20px; 
+                text-align: center; 
+              }
+              .metric-value { 
+                font-size: 2rem; 
+                font-weight: bold; 
+                color: #1f2937; 
+                margin-bottom: 5px; 
+              }
+              .metric-label { 
+                font-size: 0.9rem; 
+                color: #6b7280; 
+              }
+              .charts-grid { 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
+                gap: 30px; 
+              }
+              .chart-container { 
+                background: #f9fafb; 
+                border: 2px solid #e5e7eb; 
+                border-radius: 8px; 
+                padding: 20px; 
+              }
+              .chart-title { 
+                font-size: 1.1rem; 
+                font-weight: 600; 
+                margin-bottom: 15px; 
+                color: #1f2937; 
+              }
+              .chart-data { 
+                display: grid; 
+                gap: 8px; 
+              }
+              .data-item { 
+                display: flex; 
+                justify-content: space-between; 
+                padding: 8px 12px; 
+                background: white; 
+                border-radius: 4px; 
+                border: 1px solid #e5e7eb; 
+              }
+              .word-cloud { 
+                background: #f3f4f6; 
+                border-radius: 8px; 
+                padding: 30px; 
+                text-align: center; 
+                min-height: 200px; 
+                display: flex; 
+                flex-wrap: wrap; 
+                justify-content: center; 
+                align-items: center; 
+                gap: 10px; 
+              }
+              .word-item { 
+                display: inline-block; 
+                padding: 5px 10px; 
+                margin: 3px; 
+                background: white; 
+                border-radius: 4px; 
+                border: 1px solid #d1d5db; 
+              }
+              .footer { 
+                border-top: 2px solid #e5e5e5; 
+                padding-top: 20px; 
+                text-align: center; 
+                color: #6b7280; 
+                font-size: 0.9rem; 
+                margin-top: 40px; 
+              }
+              @media print {
+                body { padding: 20px; }
+                .chart-container { break-inside: avoid; }
+                .metric-card { break-inside: avoid; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Radio Analytics Report</h1>
+              <h2>${reportData.topicLabel} Analysis</h2>
+              <div class="header-info">
+                <span>📅 Report Period: ${reportData.dateRange.from.toLocaleDateString()} - ${reportData.dateRange.to.toLocaleDateString()}</span>
+                <span>📄 Generated: ${new Date().toLocaleDateString()}</span>
+              </div>
+            </div>
+
+            <div class="section">
+              <h2 class="section-title">🎯 Executive Summary</h2>
+              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; border: 1px solid #d1d5db;">
+                <p>This comprehensive analytics report provides insights into radio broadcast performance for the 
+                <strong>${reportData.topicLabel}</strong> topic during the specified period. 
+                The analysis covers sentiment trends, engagement metrics, audience interaction patterns, and key 
+                performance indicators derived from AI-powered transcript analysis.</p>
+              </div>
+            </div>
+
+            <div class="section">
+              <h2 class="section-title">📊 Key Performance Indicators</h2>
+              <div class="metrics-grid">
+                <div class="metric-card">
+                  <div class="metric-value">${reportData.metrics.overallPositiveSentiment?.value || 0}%</div>
+                  <div class="metric-label">${reportData.metrics.overallPositiveSentiment?.label || 'Overall Positive Sentiment'}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value">${reportData.metrics.totalMentions?.value || 0}</div>
+                  <div class="metric-label">${reportData.metrics.totalMentions?.label || 'Total On-Air Mentions'}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value">${reportData.metrics.highEngagementMoments?.value || 0}</div>
+                  <div class="metric-label">${reportData.metrics.highEngagementMoments?.label || 'High Engagement Moments'}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value">${reportData.metrics.whatsappNumberMentions?.value || 0}</div>
+                  <div class="metric-label">${reportData.metrics.whatsappNumberMentions?.label || 'WhatsApp Number Mentions'}</div>
+                </div>
+              </div>
+            </div>
+
+            ${Object.keys(reportData.charts).length > 0 ? `
+            <div class="section">
+              <h2 class="section-title">📈 Data Visualizations</h2>
+              <div class="charts-grid">
+                ${Object.entries(reportData.charts).map(([key, chart]) => {
+                  const normalizedChart = normalizeChartData(chart);
+                  if (!normalizedChart?.data || !Array.isArray(normalizedChart.data) || normalizedChart.data.length === 0) {
+                    return '';
+                  }
+                  return `
+                    <div class="chart-container">
+                      <div class="chart-title">${normalizedChart.title}</div>
+                      <div class="chart-data">
+                        ${normalizedChart.data.map((item: any) => `
+                          <div class="data-item">
+                            <span>${item.name || item.label || 'Unknown'}</span>
+                            <span><strong>${typeof item.value === 'number' ? item.value.toLocaleString() : item.value}</strong></span>
+                          </div>
+                        `).join('')}
+                      </div>
+                      ${normalizedChart.insights ? `
+                        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #e5e7eb; font-size: 0.9rem;">
+                          <strong>Analysis:</strong> ${normalizedChart.insights}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+            ` : ''}
+
+            ${reportData.wordCloudData?.wordData && reportData.wordCloudData.wordData.length > 0 ? `
+            <div class="section">
+              <h2 class="section-title">👥 Popular Topics Analysis</h2>
+              <div class="chart-container">
+                <div class="word-cloud">
+                  ${reportData.wordCloudData.wordData.map((word: any) => `
+                    <span class="word-item" style="font-size: ${Math.min(12 + (word.value * 2), 24)}px; font-weight: ${word.value > 10 ? 'bold' : 'normal'};">
+                      ${word.text} (${word.value})
+                    </span>
+                  `).join('')}
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #e5e7eb; font-size: 0.9rem;">
+                  <strong>Analysis:</strong> ${reportData.wordCloudData.metadata?.analysisScope || 'Most frequently mentioned topics from radio transcript database, with word size indicating mention frequency.'}
+                </div>
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="section">
+              <h2 class="section-title">🏆 Recommendations & Insights</h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <div>
+                  <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #1f2937;">Key Insights</h3>
+                  <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>Positive sentiment at ${reportData.metrics.overallPositiveSentiment?.value || 0}% indicates strong audience reception</span>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>Total mentions of ${reportData.metrics.totalMentions?.value || 0} show good topic visibility</span>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>High engagement moments create opportunities for deeper audience connection</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #1f2937;">Recommendations</h3>
+                  <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #8b5cf6; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>Continue focusing on content that generates positive sentiment</span>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #6366f1; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>Optimize WhatsApp call-to-action placement during peak engagement</span>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                      <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
+                      <span>Monitor trending topics for future content planning</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              <p>Radio Analytics Report • Generated by AI-Powered Analytics Platform</p>
+              <p>© ${new Date().getFullYear()} Azi Analytics Platform. All rights reserved.</p>
+            </div>
+
+            <script>
+              // Auto-print when page loads
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                }, 1000);
+              };
+              
+              // Close window after printing
+              window.onafterprint = function() {
+                setTimeout(function() {
+                  window.close();
+                }, 1000);
+              };
+            </script>
+          </body>
+        </html>
+      `;
+
+      reportWindow.document.write(reportHTML);
+      reportWindow.document.close();
+
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert(`Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   // Drill-down analysis functions
   const analyzeChartDrillDown = async (data: any, type: string, title: string) => {
     const response = await fetch('/api/chart-drill-down', {
@@ -338,6 +681,76 @@ export default function DashboardMinimal() {
   };
 
   const analyzeMetricsDrillDown = async (data: any, type: string, title: string) => {
+    console.log('🔍 analyzeMetricsDrillDown called with:', { data, type, title });
+    
+    // Special handling for Overall Positive Sentiment metric
+    if (data.metricType === "overall_positive_sentiment") {
+      console.log('✅ Using custom prompt for Overall Positive Sentiment');
+      const customPrompt = `Analyze the "Overall Positive Sentiment" metric with value ${data.metricValue}% for Shoprite radio mentions using your radio transcript database.
+
+Provide a comprehensive analysis in this structured format:
+
+## Sentiment Analysis Overview
+- Current sentiment score: ${data.metricValue}%
+- Benchmark comparison (industry average, previous periods)
+- Trend direction (improving/declining/stable)
+
+## Data Breakdown
+**Source Distribution:**
+- Radio stations contributing to this sentiment
+- Time periods analyzed (dates/hours)
+- Total mention volume analyzed
+
+**Sentiment Drivers:**
+- Specific positive mentions (quotes from transcripts)
+- Key themes driving positive sentiment
+- Presenter tone and context analysis
+
+## Shoprite-Specific Insights
+**Brand Perception:**
+- Product/service categories mentioned positively
+- Promotional campaigns referenced
+- Customer experience mentions
+
+**Competitive Context:**
+- How Shoprite sentiment compares to competitors
+- Market positioning reflected in radio coverage
+
+## Contextual Factors
+- Seasonal/temporal influences on sentiment
+- External events affecting brand perception
+- Regional variations in sentiment
+
+## Actionable Recommendations
+- Areas for improvement based on data
+- Opportunities to leverage positive sentiment
+- Content strategy suggestions for radio partnerships
+
+**Data Sources:** Specify exact radio stations, date ranges, and transcript volumes analyzed.
+**Methodology:** Explain sentiment calculation method and confidence level.
+
+Return analysis with specific transcript excerpts, quantified insights, and data-driven recommendations.`;
+
+      const response = await fetch('/api/metrics-drill-down', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metricType: data.metricType,
+          metricTitle: data.metricTitle,
+          metricValue: data.metricValue,
+          topic: selectedTopic,
+          customPrompt: customPrompt // Send the custom prompt for this specific metric
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    }
+
+    // Default behavior for other metrics
     const response = await fetch('/api/metrics-drill-down', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -638,6 +1051,45 @@ export default function DashboardMinimal() {
             />
             
             <button
+              onClick={generateReport}
+              disabled={isDashboardLoading || isGeneratingReport}
+              title="Generate comprehensive PDF report with all dashboard data, charts, and insights"
+              className={`flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
+                isDashboardLoading || isGeneratingReport ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+            </button>
+            <button
+              onClick={async () => {
+                if (reportRef.current && !isGeneratingReport) {
+                  setIsGeneratingReport(true);
+                  try {
+                    const filename = `radio-analytics-report-${selectedTopic}-${selectedDateRange.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+                    await exportToPDF(reportRef, {
+                      filename,
+                      format: 'a4',
+                      orientation: 'portrait'
+                    });
+                  } catch (error) {
+                    console.error('Error generating PDF:', error);
+                    alert('Failed to generate PDF. Please try again.');
+                  } finally {
+                    setIsGeneratingReport(false);
+                  }
+                }
+              }}
+              disabled={isDashboardLoading || isGeneratingReport}
+              title="Generate PDF report using component-based approach"
+              className={`flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors ${
+                isDashboardLoading || isGeneratingReport ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              {isGeneratingReport ? 'Creating PDF...' : 'PDF Export'}
+            </button>
+            <button
               onClick={() => loadDashboardData(true, selectedTopic, selectedDateRange)}
               disabled={isDashboardLoading}
               title="Force refresh all dashboard data and charts by bypassing cache and requesting fresh AI-generated insights"
@@ -649,9 +1101,9 @@ export default function DashboardMinimal() {
             </button>
             <div title="Access additional dashboard options including downloads, sharing, theme settings, and navigation">
               <HamburgerMenu 
-                onDownload={downloadDashboard}
-                onShare={shareDashboard}
-                onLoadMore={loadMoreData}
+                onScreenshot={downloadDashboard}
+                onShareUrl={shareDashboard}
+                onExportData={loadMoreData}
               />
             </div>
           </div>
@@ -818,6 +1270,22 @@ export default function DashboardMinimal() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Hidden Report Container for PDF Generation */}
+        <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '1200px' }}>
+          <ReportGenerator
+            ref={reportRef}
+            data={{
+              metrics: dashboardData.metrics || {},
+              charts: dashboardData.charts || {},
+              wordCloudData: state.wordCloudData,
+              dateRange: selectedDateRange,
+              selectedTopic,
+              topicLabel: topicsData.find(t => t.value === selectedTopic)?.label || 'General'
+            }}
+            normalizeChartData={normalizeChartData}
+          />
         </div>
 
       </main>

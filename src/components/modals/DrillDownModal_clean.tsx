@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database, AlertCircle } from "lucide-react";
+import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ExportDropdown from "@/components/ui/export-dropdown";
@@ -34,7 +34,6 @@ export default function DrillDownModal({
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Reset modal state when it opens
   useEffect(() => {
@@ -42,7 +41,6 @@ export default function DrillDownModal({
       setAnalysis(null);
       setHasAnalyzed(false);
       setIsLoading(false);
-      setError(null);
     }
   }, [isOpen]);
 
@@ -53,7 +51,6 @@ export default function DrillDownModal({
 
   const handleAnalyze = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       console.log(`Starting ${type} analysis for:`, data, title);
       const result = await onAnalyze(data, type, title);
@@ -62,9 +59,16 @@ export default function DrillDownModal({
       setHasAnalyzed(true);
     } catch (error) {
       console.error("Failed to analyze:", error);
-      setError(error instanceof Error ? error.message : "Analysis failed. Please try again.");
-      setAnalysis(null);
-      setHasAnalyzed(false);
+      setAnalysis({
+        summary: "Analysis failed. Please try again.",
+        breakdown: {
+          components: [],
+          timeSegments: [],
+          relatedTopics: [],
+          keyInsights: []
+        }
+      });
+      setHasAnalyzed(true);
     }
     setIsLoading(false);
   };
@@ -139,43 +143,43 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-[#2d3748] rounded-xl shadow-2xl max-w-4xl w-full m-4 max-h-[90vh] overflow-hidden border border-gray-600">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full m-4 max-h-[90vh] overflow-hidden">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 border-b border-gray-600 flex justify-between items-start bg-[#2d3748]">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-start">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                {type === 'chart' ? <BarChart className="w-5 h-5 text-[#60a5fa]" /> : <TrendingUp className="w-5 h-5 text-[#60a5fa]" />}
-                <h2 className="text-xl font-semibold text-[#e0e6ed]">{title}</h2>
+                {type === 'chart' ? <BarChart className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
+                <h2 className="text-xl font-semibold">{title}</h2>
               </div>
               {subtitle && (
-                <p className="text-sm text-[#a0aec0] mb-2 font-medium">{subtitle}</p>
+                <p className="text-sm text-gray-600 mb-2">{subtitle}</p>
               )}
               
               {/* Data Fields Display */}
               <div className="flex flex-wrap gap-2">
                 {fields.length > 0 ? (
                   fields.map((field, index) => (
-                    <Badge key={index} className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium">
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
                       <span className="font-medium">{field.label}:</span>
                       <span>{field.value}</span>
                     </Badge>
                   ))
                 ) : (
                   <>
-                    <Badge className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium">
+                    <Badge variant="secondary" className="flex items-center gap-1">
                       <Database className="w-3 h-3" />
                       <span className="font-medium">Value:</span>
                       <span>{data?.value || data?.metricValue || 'N/A'}</span>
                     </Badge>
-                    <Badge className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium">
+                    <Badge variant="secondary" className="flex items-center gap-1">
                       <Tag className="w-3 h-3" />
                       <span className="font-medium">Category:</span>
                       <span>{data?.label || data?.category || data?.metricTitle || 'N/A'}</span>
                     </Badge>
                     {data?.chartType && (
-                      <Badge className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium">
+                      <Badge variant="secondary" className="flex items-center gap-1">
                         <BarChart className="w-3 h-3" />
                         <span className="font-medium">Type:</span>
                         <span>{data.chartType}</span>
@@ -189,18 +193,16 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
             <div className="flex items-center gap-2 ml-4">
               {hasAnalyzed && analysis && (
                 <ExportDropdown
-                  onExport={(format) => {
-                    if (format === 'txt') exportAsTXT();
-                    else if (format === 'json') exportAsJSON();
-                  }}
-                  disabled={isExporting}
+                  onExportTXT={exportAsTXT}
+                  onExportJSON={exportAsJSON}
+                  isExporting={isExporting}
                 />
               )}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="text-[#a0aec0] hover:text-[#e0e6ed] hover:bg-gray-700"
+                className="text-gray-500 hover:text-gray-700"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -208,21 +210,21 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 bg-[#1f2a38] custom-scrollbar force-scrollbar">
-            <div className="space-y-6 min-h-[400px]">{/* Ensure minimum height to trigger scrollbar */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
               {/* Analysis Button */}
               {!hasAnalyzed && (
-                <div className="text-center py-8 bg-[#2d3748] rounded-xl shadow-lg">
-                  <Radio className="w-12 h-12 text-[#60a5fa] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2 text-[#cbd5e0]">AI Radio Content Analysis</h3>
-                  <p className="text-[#a0aec0] mb-4 max-w-md mx-auto">
+                <div className="text-center py-8">
+                  <Radio className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">AI Radio Content Analysis</h3>
+                  <p className="text-gray-600 mb-4">
                     Generate detailed insights about this {type} using our AI-powered analysis of radio broadcast data.
                   </p>
                   <Button 
                     onClick={handleAnalyze}
                     disabled={isLoading}
                     size="lg"
-                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white font-medium px-6 py-3 rounded-lg"
+                    className="bg-blue-600 hover:bg-blue-700"
                   >
                     {isLoading ? (
                       <>
@@ -239,52 +241,30 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
                 </div>
               )}
 
-              {/* Error Display */}
-              {error && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-[#e0e6ed] mb-2">Analysis Failed</h3>
-                  <p className="text-[#a0aec0] mb-4 max-w-md">
-                    We encountered an issue while analyzing the content. Please try again or contact support if the problem persists.
-                  </p>
-                  <p className="text-sm text-red-400 font-mono bg-red-900/20 px-3 py-2 rounded border border-red-800">
-                    {error}
-                  </p>
-                  <Button 
-                    onClick={handleAnalyze}
-                    disabled={isLoading}
-                    size="sm"
-                    className="mt-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white"
-                  >
-                    Try Again
-                  </Button>
-                </div>
-              )}
-
               {/* Analysis Results */}
               {analysis && hasAnalyzed && (
                 <div className="space-y-6">
                   {data?.metricType === "overall_positive_sentiment" ? (
                     // Shoprite Sentiment Analysis Report Format
                     <div className="space-y-6">
-                      <Card className="bg-[#2d3748] border border-green-600 shadow-lg">
+                      <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
                         <CardHeader>
-                          <CardTitle className="text-xl font-semibold text-[#e0e6ed]">
+                          <CardTitle className="text-xl font-bold text-green-800">
                             🛒 Shoprite Radio Sentiment Analysis Report
                           </CardTitle>
-                          <CardDescription className="text-base text-[#a0aec0] font-medium">
+                          <CardDescription className="text-base">
                             <div>Period Covered: {analysis.periodCovered || 'Date range not specified'}</div>
                             <div>Sentiment Score: 🟢 {data?.metricValue || analysis.sentimentScore || 'N/A'}% Positive</div>
                           </CardDescription>
                         </CardHeader>
                       </Card>
 
-                      <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
+                      <Card>
                         <CardHeader>
-                          <CardTitle className="text-[#cbd5e0] font-semibold">📋 Raw Analysis Data</CardTitle>
+                          <CardTitle>📋 Raw Analysis Data</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm bg-[#1f2a38] text-[#e0e6ed] p-4 rounded-lg border border-gray-600 overflow-auto custom-scrollbar max-h-[400px] font-mono">
+                          <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border overflow-x-auto">
                             {typeof analysis === 'string' ? analysis : JSON.stringify(analysis, null, 2)}
                           </pre>
                         </CardContent>
@@ -293,15 +273,15 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
                   ) : (
                     // Default analysis format for other metrics
                     <div className="space-y-6">
-                      <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
+                      <Card>
                         <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-[#cbd5e0] font-semibold">
-                            <Lightbulb className="w-5 h-5 text-[#60a5fa]" />
+                          <CardTitle className="flex items-center gap-2">
+                            <Lightbulb className="w-5 h-5" />
                             Radio Content Analysis Results
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm bg-[#1f2a38] text-[#e0e6ed] p-4 rounded-lg border border-gray-600 overflow-auto custom-scrollbar max-h-[400px] font-mono">
+                          <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded border overflow-x-auto">
                             {typeof analysis === 'string' ? analysis : JSON.stringify(analysis, null, 2)}
                           </pre>
                         </CardContent>

@@ -85,7 +85,7 @@ export default function SimpleChatFixedPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [showSuggestionHelp, setShowSuggestionHelp] = useState(false);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
-  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(true);
+  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState("");
 
   const [assistantPersonality, setAssistantPersonality] = useState("Analytical");
@@ -592,7 +592,7 @@ export default function SimpleChatFixedPage() {
 
       <div className="flex-1 flex flex-row relative">
         {/* Top right Show Suggestion Prompt button (only when dialog is closed) */}
-        <div className="absolute right-8 top-4 z-50">
+        <div className="absolute right-8 top-4 z-50" style={{ display: 'none' }}>
           <div
             style={{
               transition: 'opacity 0.5s cubic-bezier(0.4,0,0.2,1), transform 0.5s cubic-bezier(0.4,0,0.2,1)',
@@ -613,7 +613,7 @@ export default function SimpleChatFixedPage() {
         </div>
 
         {/* Suggestions Docked Right */}
-        {suggestionsDialogOpen && (
+        {false && suggestionsDialogOpen && (
           <div
             ref={sidebarRef}
             className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-lg z-40 flex flex-col"
@@ -718,9 +718,8 @@ export default function SimpleChatFixedPage() {
             flex: 1,
             minWidth: 0,
             maxWidth: '100%',
-            // Add right margin only when panel is open so chat area is not covered
-            marginRight: suggestionsDialogOpen ? '320px' : 0,
-            transition: 'margin-right 0.5s cubic-bezier(0.4,0,0.2,1)',
+            // Panel is hidden, so no margin adjustment needed
+            marginRight: 0,
           }}
         >
           {/* Messages Area */}
