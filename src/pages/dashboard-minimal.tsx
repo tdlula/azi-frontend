@@ -116,9 +116,9 @@ export default function DashboardMinimal() {
 
   const isDashboardLoading = state.isDashboardLoading;
 
-  // Normalize chart data to handle both old and new value formats
+  // Enhanced chart data normalization to handle new chartPrompts.json format
   const normalizeChartData = (chart: any) => {
-    if (!chart || !chart.data) {
+    if (!chart || (!chart.data && !chart.datasets)) {
       console.warn('🔧 Chart normalization: No chart or data found', chart);
       return chart;
     }
@@ -128,49 +128,103 @@ export default function DashboardMinimal() {
       
       console.log('🔧 Normalizing chart:', chart.title, 'Original data:', chart.data);
       
-      // Handle case where chart.data is an object (new backend format)
-      let dataArray = chart.data;
-      if (!Array.isArray(chart.data)) {
-        console.log('🔧 Chart data is not an array, converting:', chart.data);
-        if (typeof chart.data === 'object' && chart.data !== null) {
-          // If data is an object, convert it to array format
-          dataArray = Object.entries(chart.data).map(([key, value]) => ({
-            name: key,
-            value: typeof value === 'number' ? value : (typeof value === 'object' && value !== null && typeof (value as any).value === 'number') ? (value as any).value : 0,
-            label: key
-          }));
-        } else {
-          console.warn('🔧 Chart data is not a valid format:', chart.data);
-          dataArray = [];
-        }
-      }
+      // Determine chart type - handle both 'type' and 'chart_type' fields
+      const chartType = chart.type || chart.chart_type || 'bar';
+      normalizedChart.type = chartType;
+      normalizedChart.chart_type = chartType;
       
-      normalizedChart.data = dataArray.map((item: any, index: number) => {
-        const normalizedItem = { ...item };
+      // Handle different data formats based on chart type
+      if (chartType === 'line' || chartType === 'radar') {
+        // These charts use the complex format: {labels: [], datasets: []}
+        if (chart.data && chart.data.labels && chart.data.datasets) {
+          // Data is already in the correct format
+          normalizedChart.data = chart.data;
+        } else if (Array.isArray(chart.data)) {
+          // Convert array format to line/radar format
+          console.log('🔧 Converting array data to line/radar format');
+          normalizedChart.data = {
+            labels: chart.data.map((item: any, index: number) => 
+              item.label || item.name || `Point ${index + 1}`
+            ),
+            datasets: [{
+              label: chart.title || `${chartType} Data`,
+              data: chart.data.map((item: any) => {
+                const value = typeof item.value === 'object' && item.value !== null 
+                  ? item.value.value 
+                  : item.value;
+                return typeof value === 'number' ? value : 0;
+              }),
+              color: chart.data[0]?.color || '#3b82f6'
+            }]
+          };
+        }
+      } else {
+        // Handle simple array format for donut, bar, pie charts
+        let dataArray = chart.data;
         
-        // Handle value field - convert object to number if needed
-        if (typeof item.value === 'object' && item.value !== null) {
-          console.log(`🔧 Converting object value at index ${index}:`, item.value);
-          normalizedItem.value = typeof item.value.value === 'number' ? item.value.value : 0;
-          // Preserve label if it exists
-          if (item.value.label) {
-            normalizedItem.label = item.value.label;
+        if (!Array.isArray(chart.data)) {
+          console.log('🔧 Chart data is not an array, converting:', chart.data);
+          if (typeof chart.data === 'object' && chart.data !== null) {
+            // Convert object to array format
+            if (chart.data.labels && chart.data.datasets) {
+              // Convert complex format to simple array for bar/donut charts
+              const firstDataset = chart.data.datasets[0];
+              if (firstDataset && Array.isArray(firstDataset.data)) {
+                dataArray = chart.data.labels.map((label: string, index: number) => ({
+                  name: label,
+                  label: label,
+                  value: firstDataset.data[index] || 0,
+                  color: firstDataset.color || '#3b82f6'
+                }));
+              }
+            } else {
+              // Convert generic object to array format
+              dataArray = Object.entries(chart.data).map(([key, value]) => ({
+                name: key,
+                label: key,
+                value: typeof value === 'number' ? value : 
+                      (typeof value === 'object' && value !== null && typeof (value as any).value === 'number') 
+                        ? (value as any).value : 0
+              }));
+            }
+          } else {
+            console.warn('🔧 Chart data is not a valid format:', chart.data);
+            dataArray = [];
           }
-        } else if (typeof item.value !== 'number') {
-          console.warn(`🔧 Non-numeric value at index ${index}:`, item.value, 'Converting to 0');
-          normalizedItem.value = 0;
         }
         
-        // Ensure name exists
-        if (!normalizedItem.name && normalizedItem.label) {
-          normalizedItem.name = normalizedItem.label;
-        }
-        if (!normalizedItem.name && !normalizedItem.label) {
-          normalizedItem.name = `Item ${index + 1}`;
-        }
-        
-        return normalizedItem;
-      });
+        // Normalize each data point in the array
+        normalizedChart.data = dataArray.map((item: any, index: number) => {
+          const normalizedItem = { ...item };
+          
+          // Handle value field - convert object to number if needed
+          if (typeof item.value === 'object' && item.value !== null) {
+            console.log(`🔧 Converting object value at index ${index}:`, item.value);
+            normalizedItem.value = typeof item.value.value === 'number' ? item.value.value : 0;
+            // Preserve label if it exists
+            if (item.value.label) {
+              normalizedItem.label = item.value.label;
+            }
+          } else if (typeof item.value !== 'number') {
+            console.warn(`🔧 Non-numeric value at index ${index}:`, item.value, 'Converting to 0');
+            normalizedItem.value = 0;
+          }
+          
+          // Ensure name/label exists
+          if (!normalizedItem.name && normalizedItem.label) {
+            normalizedItem.name = normalizedItem.label;
+          }
+          if (!normalizedItem.label && normalizedItem.name) {
+            normalizedItem.label = normalizedItem.name;
+          }
+          if (!normalizedItem.name && !normalizedItem.label) {
+            normalizedItem.name = `Item ${index + 1}`;
+            normalizedItem.label = `Item ${index + 1}`;
+          }
+          
+          return normalizedItem;
+        });
+      }
       
       // Handle wordData if it exists
       if (chart.wordData) {
@@ -187,23 +241,33 @@ export default function DashboardMinimal() {
         });
       }
       
-      // Ensure required chart properties exist
-      if (!normalizedChart.xKey) normalizedChart.xKey = 'name';
-      if (!normalizedChart.yKey) normalizedChart.yKey = 'value';
-      
-      // Handle both 'type' and 'chart_type' fields for compatibility
-      if (!normalizedChart.type && normalizedChart.chart_type) {
-        normalizedChart.type = normalizedChart.chart_type;
+      // Set chart keys based on chart type
+      if (chartType === 'line' || chartType === 'radar') {
+        // For complex charts, these keys are not used
+        normalizedChart.xKey = null;
+        normalizedChart.yKey = null;
+      } else {
+        // For simple charts, ensure keys exist
+        if (!normalizedChart.xKey) normalizedChart.xKey = 'name';
+        if (!normalizedChart.yKey) normalizedChart.yKey = 'value';
       }
-      if (!normalizedChart.type) normalizedChart.type = 'bar';
       
       // Ensure title exists - preserve existing title or generate one
       if (!normalizedChart.title) {
-        const chartType = normalizedChart.type || 'chart';
         normalizedChart.title = `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`;
       }
       
-      console.log('🔧 Normalized chart data:', normalizedChart.data);
+      // Preserve enhanced metadata from chartPrompts.json
+      if (chart.metadata) {
+        normalizedChart.metadata = {
+          ...chart.metadata,
+          // Ensure legacy compatibility
+          dataSource: chart.metadata.dataSource || chart.metadata.topic || 'Radio Analytics',
+          lastUpdated: chart.metadata.lastUpdated || new Date().toISOString(),
+        };
+      }
+      
+      console.log('🔧 Normalized chart data:', normalizedChart);
       return normalizedChart;
       
     } catch (error) {
@@ -231,7 +295,7 @@ export default function DashboardMinimal() {
       dateRange: selectedDateRange
     });
     
-    // Only load data if not already loaded
+    // Only load data if not already loaded OR if topic/date range changed
     if (!state.dashboardData || Object.keys(state.dashboardData).length === 0) {
       console.log('🔄 Loading dashboard data for first time...');
       loadDashboardData(false, selectedTopic, selectedDateRange);
@@ -241,7 +305,31 @@ export default function DashboardMinimal() {
     if (!state.wordCloudData || !state.wordCloudData.wordData || state.wordCloudData.wordData.length === 0) {
       loadWordCloudData();
     }
-  }, [state.dashboardData, selectedTopic, selectedDateRange]);
+  }, [selectedTopic, selectedDateRange]); // Removed state.dashboardData dependency to prevent double loading
+
+  // Handle topic/date changes with useRef to track previous values
+  const prevTopic = useRef(selectedTopic);
+  const prevDateRange = useRef(selectedDateRange);
+  
+  useEffect(() => {
+    // Only reload if topic or date range actually changed and we have existing data
+    const topicChanged = prevTopic.current !== selectedTopic;
+    const dateChanged = prevDateRange.current !== selectedDateRange;
+    
+    if ((topicChanged || dateChanged) && state.dashboardData && Object.keys(state.dashboardData).length > 0) {
+      console.log('🔄 Topic or date range changed, reloading dashboard data...', {
+        topicChanged,
+        dateChanged,
+        oldTopic: prevTopic.current,
+        newTopic: selectedTopic
+      });
+      loadDashboardData(true, selectedTopic, selectedDateRange); // Force refresh for topic/date changes
+    }
+    
+    // Update refs
+    prevTopic.current = selectedTopic;
+    prevDateRange.current = selectedDateRange;
+  }, [selectedTopic, selectedDateRange, state.dashboardData]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -334,323 +422,79 @@ export default function DashboardMinimal() {
     try {
       setIsGeneratingReport(true);
       
-      // Prepare report data
-      const reportData = {
-        metrics: dashboardData.metrics || {},
-        charts: dashboardData.charts || {},
-        wordCloudData: state.wordCloudData,
-        dateRange: selectedDateRange,
-        selectedTopic,
-        topicLabel: topicsData.find(t => t.value === selectedTopic)?.label || 'General'
-      };
+      // Use the same approach as PDF Export but open in new window for printing
+      if (reportRef.current) {
+        // Clone the report element to create a standalone version
+        const reportElement = reportRef.current.cloneNode(true) as HTMLElement;
+        
+        // Create filename
+        const filename = `radio-analytics-report-${selectedTopic}-${selectedDateRange.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`;
+        
+        // Open report in new window
+        const reportWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!reportWindow) {
+          throw new Error('Failed to open report window. Please allow popups for this site.');
+        }
 
-      // Create filename
-      const filename = `radio-analytics-report-${selectedTopic}-${selectedDateRange.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-      
-      // Open report in new window for PDF generation
-      const reportWindow = window.open('', '_blank', 'width=1200,height=800');
-      if (!reportWindow) {
-        throw new Error('Failed to open report window. Please allow popups for this site.');
+        // Generate report HTML using the ReportGenerator component styles
+        const reportHTML = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Radio Analytics Report</title>
+              <meta charset="utf-8">
+              <style>
+                @page {
+                  size: A4;
+                  margin: 0.75in;
+                }
+                * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                body {
+                  font-family: 'Segoe UI', 'Calibri', 'Helvetica Neue', Arial, sans-serif;
+                  background: white;
+                  color: #2c3e50;
+                  line-height: 1.5;
+                  font-size: 11pt;
+                  font-weight: 400;
+                }
+                @media print {
+                  body { padding: 20px; }
+                  .section { page-break-inside: avoid; }
+                  .chart-container { break-inside: avoid; }
+                  .metric-card { break-inside: avoid; }
+                }
+              </style>
+            </head>
+            <body>
+              ${reportElement.outerHTML}
+              <script>
+                // Auto-print when page loads
+                window.onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                  }, 1000);
+                };
+                
+                // Close window after printing
+                window.onafterprint = function() {
+                  setTimeout(function() {
+                    window.close();
+                  }, 1000);
+                };
+              </script>
+            </body>
+          </html>
+        `;
+
+        reportWindow.document.write(reportHTML);
+        reportWindow.document.close();
       }
-
-      // Generate report HTML
-      const reportHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Radio Analytics Report</title>
-            <meta charset="utf-8">
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: white; 
-                color: black; 
-                line-height: 1.6;
-                padding: 40px;
-              }
-              .header { 
-                text-align: center; 
-                border-bottom: 2px solid #e5e5e5; 
-                padding-bottom: 30px; 
-                margin-bottom: 40px; 
-              }
-              .header h1 { 
-                font-size: 2.5rem; 
-                font-weight: bold; 
-                color: #1f2937; 
-                margin-bottom: 10px; 
-              }
-              .header h2 { 
-                font-size: 1.5rem; 
-                font-weight: 600; 
-                color: #4b5563; 
-                margin-bottom: 20px; 
-              }
-              .header-info { 
-                display: flex; 
-                justify-content: center; 
-                gap: 30px; 
-                font-size: 0.9rem; 
-                color: #6b7280; 
-              }
-              .section { 
-                margin-bottom: 40px; 
-              }
-              .section-title { 
-                font-size: 1.5rem; 
-                font-weight: bold; 
-                color: #1f2937; 
-                margin-bottom: 20px; 
-                display: flex; 
-                align-items: center; 
-                gap: 10px; 
-              }
-              .metrics-grid { 
-                display: grid; 
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-                gap: 20px; 
-                margin-bottom: 30px; 
-              }
-              .metric-card { 
-                background: #f9fafb; 
-                border: 2px solid #e5e7eb; 
-                border-radius: 8px; 
-                padding: 20px; 
-                text-align: center; 
-              }
-              .metric-value { 
-                font-size: 2rem; 
-                font-weight: bold; 
-                color: #1f2937; 
-                margin-bottom: 5px; 
-              }
-              .metric-label { 
-                font-size: 0.9rem; 
-                color: #6b7280; 
-              }
-              .charts-grid { 
-                display: grid; 
-                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-                gap: 30px; 
-              }
-              .chart-container { 
-                background: #f9fafb; 
-                border: 2px solid #e5e7eb; 
-                border-radius: 8px; 
-                padding: 20px; 
-              }
-              .chart-title { 
-                font-size: 1.1rem; 
-                font-weight: 600; 
-                margin-bottom: 15px; 
-                color: #1f2937; 
-              }
-              .chart-data { 
-                display: grid; 
-                gap: 8px; 
-              }
-              .data-item { 
-                display: flex; 
-                justify-content: space-between; 
-                padding: 8px 12px; 
-                background: white; 
-                border-radius: 4px; 
-                border: 1px solid #e5e7eb; 
-              }
-              .word-cloud { 
-                background: #f3f4f6; 
-                border-radius: 8px; 
-                padding: 30px; 
-                text-align: center; 
-                min-height: 200px; 
-                display: flex; 
-                flex-wrap: wrap; 
-                justify-content: center; 
-                align-items: center; 
-                gap: 10px; 
-              }
-              .word-item { 
-                display: inline-block; 
-                padding: 5px 10px; 
-                margin: 3px; 
-                background: white; 
-                border-radius: 4px; 
-                border: 1px solid #d1d5db; 
-              }
-              .footer { 
-                border-top: 2px solid #e5e5e5; 
-                padding-top: 20px; 
-                text-align: center; 
-                color: #6b7280; 
-                font-size: 0.9rem; 
-                margin-top: 40px; 
-              }
-              @media print {
-                body { padding: 20px; }
-                .chart-container { break-inside: avoid; }
-                .metric-card { break-inside: avoid; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Radio Analytics Report</h1>
-              <h2>${reportData.topicLabel} Analysis</h2>
-              <div class="header-info">
-                <span>📅 Report Period: ${reportData.dateRange.from.toLocaleDateString()} - ${reportData.dateRange.to.toLocaleDateString()}</span>
-                <span>📄 Generated: ${new Date().toLocaleDateString()}</span>
-              </div>
-            </div>
-
-            <div class="section">
-              <h2 class="section-title">🎯 Executive Summary</h2>
-              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; border: 1px solid #d1d5db;">
-                <p>This comprehensive analytics report provides insights into radio broadcast performance for the 
-                <strong>${reportData.topicLabel}</strong> topic during the specified period. 
-                The analysis covers sentiment trends, engagement metrics, audience interaction patterns, and key 
-                performance indicators derived from AI-powered transcript analysis.</p>
-              </div>
-            </div>
-
-            <div class="section">
-              <h2 class="section-title">📊 Key Performance Indicators</h2>
-              <div class="metrics-grid">
-                <div class="metric-card">
-                  <div class="metric-value">${reportData.metrics.overallPositiveSentiment?.value || 0}%</div>
-                  <div class="metric-label">${reportData.metrics.overallPositiveSentiment?.label || 'Overall Positive Sentiment'}</div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-value">${reportData.metrics.totalMentions?.value || 0}</div>
-                  <div class="metric-label">${reportData.metrics.totalMentions?.label || 'Total On-Air Mentions'}</div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-value">${reportData.metrics.highEngagementMoments?.value || 0}</div>
-                  <div class="metric-label">${reportData.metrics.highEngagementMoments?.label || 'High Engagement Moments'}</div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-value">${reportData.metrics.whatsappNumberMentions?.value || 0}</div>
-                  <div class="metric-label">${reportData.metrics.whatsappNumberMentions?.label || 'WhatsApp Number Mentions'}</div>
-                </div>
-              </div>
-            </div>
-
-            ${Object.keys(reportData.charts).length > 0 ? `
-            <div class="section">
-              <h2 class="section-title">📈 Data Visualizations</h2>
-              <div class="charts-grid">
-                ${Object.entries(reportData.charts).map(([key, chart]) => {
-                  const normalizedChart = normalizeChartData(chart);
-                  if (!normalizedChart?.data || !Array.isArray(normalizedChart.data) || normalizedChart.data.length === 0) {
-                    return '';
-                  }
-                  return `
-                    <div class="chart-container">
-                      <div class="chart-title">${normalizedChart.title}</div>
-                      <div class="chart-data">
-                        ${normalizedChart.data.map((item: any) => `
-                          <div class="data-item">
-                            <span>${item.name || item.label || 'Unknown'}</span>
-                            <span><strong>${typeof item.value === 'number' ? item.value.toLocaleString() : item.value}</strong></span>
-                          </div>
-                        `).join('')}
-                      </div>
-                      ${normalizedChart.insights ? `
-                        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #e5e7eb; font-size: 0.9rem;">
-                          <strong>Analysis:</strong> ${normalizedChart.insights}
-                        </div>
-                      ` : ''}
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-            ` : ''}
-
-            ${reportData.wordCloudData?.wordData && reportData.wordCloudData.wordData.length > 0 ? `
-            <div class="section">
-              <h2 class="section-title">👥 Popular Topics Analysis</h2>
-              <div class="chart-container">
-                <div class="word-cloud">
-                  ${reportData.wordCloudData.wordData.map((word: any) => `
-                    <span class="word-item" style="font-size: ${Math.min(12 + (word.value * 2), 24)}px; font-weight: ${word.value > 10 ? 'bold' : 'normal'};">
-                      ${word.text} (${word.value})
-                    </span>
-                  `).join('')}
-                </div>
-                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #e5e7eb; font-size: 0.9rem;">
-                  <strong>Analysis:</strong> ${reportData.wordCloudData.metadata?.analysisScope || 'Most frequently mentioned topics from radio transcript database, with word size indicating mention frequency.'}
-                </div>
-              </div>
-            </div>
-            ` : ''}
-
-            <div class="section">
-              <h2 class="section-title">🏆 Recommendations & Insights</h2>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                <div>
-                  <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #1f2937;">Key Insights</h3>
-                  <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>Positive sentiment at ${reportData.metrics.overallPositiveSentiment?.value || 0}% indicates strong audience reception</span>
-                    </li>
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>Total mentions of ${reportData.metrics.totalMentions?.value || 0} show good topic visibility</span>
-                    </li>
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>High engagement moments create opportunities for deeper audience connection</span>
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #1f2937;">Recommendations</h3>
-                  <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #8b5cf6; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>Continue focusing on content that generates positive sentiment</span>
-                    </li>
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #6366f1; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>Optimize WhatsApp call-to-action placement during peak engagement</span>
-                    </li>
-                    <li style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
-                      <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; margin-top: 8px; flex-shrink: 0;"></span>
-                      <span>Monitor trending topics for future content planning</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="footer">
-              <p>Radio Analytics Report • Generated by AI-Powered Analytics Platform</p>
-              <p>© ${new Date().getFullYear()} Azi Analytics Platform. All rights reserved.</p>
-            </div>
-
-            <script>
-              // Auto-print when page loads
-              window.onload = function() {
-                setTimeout(function() {
-                  window.print();
-                }, 1000);
-              };
-              
-              // Close window after printing
-              window.onafterprint = function() {
-                setTimeout(function() {
-                  window.close();
-                }, 1000);
-              };
-            </script>
-          </body>
-        </html>
-      `;
-
-      reportWindow.document.write(reportHTML);
-      reportWindow.document.close();
 
     } catch (error) {
       console.error('Error generating report:', error);
@@ -903,6 +747,57 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                     <p className="text-xs sm:text-sm text-muted-foreground">
                       <span className="font-medium">AI Insight:</span> {normalizedChart.insights}
                     </p>
+                  </div>
+                )}
+                {/* Enhanced Metadata Display */}
+                {normalizedChart.metadata && (
+                  <div className="mt-3 p-3 bg-muted/20 rounded-lg">
+                    <details className="group">
+                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        📊 Chart Metadata
+                        <span className="ml-2 group-open:rotate-180 inline-block transition-transform">▼</span>
+                      </summary>
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {normalizedChart.metadata.topic && (
+                          <div><span className="font-medium">Topic:</span> {normalizedChart.metadata.topic}</div>
+                        )}
+                        {normalizedChart.metadata.analysis_period && (
+                          <div>
+                            <span className="font-medium">Period:</span> {
+                              normalizedChart.metadata.analysis_period.start_datetime || normalizedChart.metadata.analysis_period.start_date
+                            } - {
+                              normalizedChart.metadata.analysis_period.end_datetime || normalizedChart.metadata.analysis_period.end_date
+                            }
+                          </div>
+                        )}
+                        {normalizedChart.metadata.total_entries_analyzed && (
+                          <div><span className="font-medium">Entries Analyzed:</span> {normalizedChart.metadata.total_entries_analyzed}</div>
+                        )}
+                        {normalizedChart.metadata.total_mentions_analyzed && (
+                          <div><span className="font-medium">Mentions Analyzed:</span> {normalizedChart.metadata.total_mentions_analyzed}</div>
+                        )}
+                        {normalizedChart.metadata.score_scale && (
+                          <div><span className="font-medium">Score Scale:</span> {normalizedChart.metadata.score_scale}</div>
+                        )}
+                        {normalizedChart.metadata.source_count && (
+                          <div>
+                            <span className="font-medium">Sources:</span> 
+                            Call-ins: {normalizedChart.metadata.source_count.call_ins}, 
+                            WhatsApp: {normalizedChart.metadata.source_count.whatsapp_feedback}, 
+                            Presenter: {normalizedChart.metadata.source_count.presenter_segments}
+                          </div>
+                        )}
+                        {normalizedChart.metadata.scoring_criteria && (
+                          <div><span className="font-medium">Criteria:</span> {normalizedChart.metadata.scoring_criteria.join(', ')}</div>
+                        )}
+                        {normalizedChart.metadata.metrics_included && (
+                          <div><span className="font-medium">Metrics:</span> {normalizedChart.metadata.metrics_included.join(', ')}</div>
+                        )}
+                        {normalizedChart.metadata.smoothing_method && (
+                          <div><span className="font-medium">Smoothing:</span> {normalizedChart.metadata.smoothing_method}</div>
+                        )}
+                      </div>
+                    </details>
                   </div>
                 )}
               </div>

@@ -12,6 +12,27 @@ interface ChartRendererProps {
   onChartClick?: (dataPoint: any, chartType: string, chartTitle: string) => void;
 }
 
+// Chart wrapper component to include AI insights
+function ChartWithInsights({ children, chartData }: { children: React.ReactNode; chartData: ChartData }) {
+  return (
+    <div className="chart-container">
+      {children}
+      {(chartData as any).aiInsight && (
+        <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/40">
+          <p className="text-sm text-muted-foreground italic">
+            {(chartData as any).aiInsight}
+          </p>
+          {(chartData as any).sourceInfo && (
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              {(chartData as any).sourceInfo}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChartRenderer({ chartData, onChartClick }: ChartRendererProps) {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -33,7 +54,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     }
   }, [chartData]);
 
-  // Validate chart data
+  // Validate chart data - enhanced for new chartPrompts.json format
   const validateChartData = (data: ChartData): string | null => {
     if (!data) return "Chart data is missing";
     
@@ -47,13 +68,23 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     // Handle both array and object data formats
     if (!data.data) return "Chart data is missing";
     
-    // For array format
+    // For array format (simple charts: donut, bar, pie)
     if (Array.isArray(data.data)) {
       if (data.data.length === 0) return "Chart data is empty";
     } 
-    // For object format (from new backend)
+    // For object format (complex charts: line, radar from new backend)
     else if (typeof data.data === 'object') {
-      if (Object.keys(data.data).length === 0) return "Chart data is empty";
+      // Check for complex chart format {labels: [], datasets: []}
+      if ((data.data as any).labels && (data.data as any).datasets) {
+        if (!Array.isArray((data.data as any).labels) || (data.data as any).labels.length === 0) {
+          return "Chart labels are missing or empty";
+        }
+        if (!Array.isArray((data.data as any).datasets) || (data.data as any).datasets.length === 0) {
+          return "Chart datasets are missing or empty";
+        }
+      } else if (Object.keys(data.data).length === 0) {
+        return "Chart data is empty";
+      }
     } 
     else {
       return "Chart data format is invalid";
@@ -139,159 +170,189 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     // Handle both specific chart format (chart_type) and generic format (type)
     const chartType = chartData.type || (chartData as any).chart_type;
     const chartTitle = chartData.title || `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`;
-    const chartDataArray = chartData.data;
-    const { xKey, yKey } = chartData;
     
     const { theme } = useTheme();
     const baseColors = getChartColors();
   
-  // Determine if we're in dark mode
-  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    // Determine if we're in dark mode
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  // Ensure data exists and is an array
-  if (!chartDataArray || !Array.isArray(chartDataArray) || chartDataArray.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
-        <div className="text-center">
-          <p className="text-lg font-medium">No data available</p>
-          <p className="text-sm mt-1">Please provide data to generate a chart</p>
-        </div>
-      </div>
-    );
-  }
+    // Determine data format and process accordingly
+    let processedData: any[] = [];
+    let isComplexFormat = false;
+    let complexData: { labels: string[]; datasets: any[] } | null = null;
 
-  // Function to safely get values from data
-  const getValue = (item: any, key: string | undefined, fallback: any = 0) => {
-    if (!item || typeof item !== 'object') return fallback;
-    
-    let value = item[key || ''] ?? item.value ?? fallback;
-    
-    // Handle nested object values (new format)
-    if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
-      return value.value;
-    }
-    
-    // Ensure we always return a number
-    const numValue = Number(value);
-    return isNaN(numValue) ? fallback : numValue;
-  };
+    // Check if data is in complex format (for line/radar charts)
+    if (!Array.isArray(chartData.data) && 
+        typeof chartData.data === 'object' && 
+        (chartData.data as any).labels && 
+        (chartData.data as any).datasets) {
+      
+      isComplexFormat = true;
+      complexData = chartData.data as { labels: string[]; datasets: any[] };
+      console.log('🔧 Using complex data format:', complexData);
+      
+      // For complex format, create processedData for compatibility with existing color logic
+      if (complexData.datasets.length > 0) {
+        const firstDataset = complexData.datasets[0];
+        processedData = complexData.labels.map((label, index) => ({
+          name: label,
+          value: firstDataset.data[index] || 0,
+          x: label,
+          y: firstDataset.data[index] || 0
+        }));
+      }
+    } else {
+      // Handle simple array format
+      const chartDataArray = Array.isArray(chartData.data) ? chartData.data : [];
+      const { xKey, yKey } = chartData;
+      
+      console.log('🔧 Using simple array data format:', chartDataArray);
+      
+      // Ensure data exists and is an array
+      if (!chartDataArray || chartDataArray.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            <div className="text-center">
+              <p className="text-lg font-medium">No data available</p>
+              <p className="text-sm mt-1">Please provide data to generate a chart</p>
+            </div>
+          </div>
+        );
+      }
 
-  const getName = (item: any, fallback: string = 'Unknown') => {
-    if (!item || typeof item !== 'object') return fallback;
-    return item.name ?? item.label ?? item.category ?? fallback;
-  };
-  
-  // Helper function to safely extract numeric values for charts
-  const safeNumericValue = (value: any, fallback: number = 0): number => {
-    if (typeof value === 'number' && !isNaN(value)) return value;
-    if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
-      return value.value;
-    }
-    const numValue = Number(value);
-    if (isNaN(numValue)) {
-      console.warn('🔧 Invalid numeric value:', value, 'Using fallback:', fallback);
-      return fallback;
-    }
-    return numValue;
-  };
-  
-  // Extract values for dynamic coloring (after getValue function is defined)
-  const values = chartDataArray.map(item => getValue(item, yKey, 0));
-  const dynamicColors = generateValueBasedColors(values);
-  const { colors: gradientColors, gradients } = generateGradientColors(values);
-
-  // Base ApexCharts configuration with built-in zoom and click events
-  const baseConfig = {
-    chart: {
-      background: 'transparent',
-      events: {
-        dataPointSelection: function(event: any, chartContext: any, config: any) {
-          if (onChartClick) {
-            const dataPoint = {
-              seriesIndex: config.seriesIndex,
-              dataPointIndex: config.dataPointIndex,
-              value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
-              label: config.w.globals.labels[config.dataPointIndex],
-              category: config.w.config.xaxis.categories ? config.w.config.xaxis.categories[config.dataPointIndex] : null
-            };
-            onChartClick(dataPoint, chartType, chartTitle || 'Chart');
-          }
+      // Function to safely get values from data
+      const getValue = (item: any, key: string | undefined, fallback: any = 0) => {
+        if (!item || typeof item !== 'object') return fallback;
+        
+        let value = item[key || ''] ?? item.value ?? fallback;
+        
+        // Handle nested object values (new format)
+        if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
+          return value.value;
         }
-      },
-      toolbar: {
-        show: true,
-        offsetX: 0,
-        offsetY: 0,
-        tools: {
-          download: true,
-          selection: true,
-          zoom: true,
-          zoomin: true,
-          zoomout: true,
-          pan: true,
-          reset: true
+        
+        // Ensure we always return a number
+        const numValue = Number(value);
+        return isNaN(numValue) ? fallback : numValue;
+      };
+
+      const getName = (item: any, fallback: string = 'Unknown') => {
+        if (!item || typeof item !== 'object') return fallback;
+        return item.name ?? item.label ?? item.category ?? fallback;
+      };
+      
+      // Helper function to safely extract numeric values for charts
+      const safeNumericValue = (value: any, fallback: number = 0): number => {
+        if (typeof value === 'number' && !isNaN(value)) return value;
+        if (typeof value === 'object' && value !== null && typeof value.value === 'number') {
+          return value.value;
+        }
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          console.warn('🔧 Invalid numeric value:', value, 'Using fallback:', fallback);
+          return fallback;
+        }
+        return numValue;
+      };
+      
+      // Prepare chart data with enhanced error checking
+      processedData = chartDataArray.map((item: any, index: number) => {
+        const name = getName(item, `Item ${index + 1}`);
+        const value = safeNumericValue(getValue(item, yKey || 'value', 0));
+        
+        console.log(`🔧 Processing chart data item ${index}:`, {
+          original: item,
+          name,
+          value,
+          type: typeof value
+        });
+        
+        return {
+          name,
+          value,
+          x: getValue(item, xKey || 'name', name),
+          y: value
+        };
+      });
+    }
+    
+    // Extract values for dynamic coloring
+    const values = processedData.map(item => item.value);
+    const dynamicColors = generateValueBasedColors(values);
+    const { colors: gradientColors, gradients } = generateGradientColors(values);
+    // Base ApexCharts configuration with built-in zoom and click events
+    const baseConfig = {
+      chart: {
+        background: 'transparent',
+        events: {
+          dataPointSelection: function(event: any, chartContext: any, config: any) {
+            if (onChartClick) {
+              const dataPoint = {
+                seriesIndex: config.seriesIndex,
+                dataPointIndex: config.dataPointIndex,
+                value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                label: config.w.globals.labels[config.dataPointIndex],
+                category: config.w.config.xaxis.categories ? config.w.config.xaxis.categories[config.dataPointIndex] : null
+              };
+              onChartClick(dataPoint, chartType, chartTitle || 'Chart');
+            }
+          }
         },
-        export: {
-          csv: {
-            filename: chartTitle || 'chart-data'
+        toolbar: {
+          show: true,
+          offsetX: 0,
+          offsetY: 0,
+          tools: {
+            download: true,
+            selection: true,
+            zoom: true,
+            zoomin: true,
+            zoomout: true,
+            pan: true,
+            reset: true
           },
-          svg: {
-            filename: chartTitle || 'chart'
-          },
-          png: {
-            filename: chartTitle || 'chart'
+          export: {
+            csv: {
+              filename: chartTitle || 'chart-data'
+            },
+            svg: {
+              filename: chartTitle || 'chart'
+            },
+            png: {
+              filename: chartTitle || 'chart'
+            }
           }
+        },
+        zoom: {
+          enabled: true,
+          type: 'xy' as const,
+          autoScaleYaxis: true
+        },
+        selection: {
+          enabled: true
         }
       },
-      zoom: {
-        enabled: true,
-        type: 'xy' as const,
-        autoScaleYaxis: true
+      theme: {
+        mode: (isDark ? 'dark' : 'light') as 'dark' | 'light'
       },
-      selection: {
-        enabled: true
+      colors: dynamicColors,
+      tooltip: {
+        theme: (isDark ? 'dark' : 'light') as 'dark' | 'light',
+        style: {
+          fontSize: '12px',
+          fontFamily: 'inherit'
+        }
+      },
+      legend: {
+        show: true
+      },
+      grid: {
+        show: true
       }
-    },
-    theme: {
-      mode: (isDark ? 'dark' : 'light') as 'dark' | 'light'
-    },
-    colors: dynamicColors,
-    tooltip: {
-      theme: (isDark ? 'dark' : 'light') as 'dark' | 'light',
-      style: {
-        fontSize: '12px',
-        fontFamily: 'inherit'
-      }
-    },
-    legend: {
-      show: true
-    },
-    grid: {
-      show: true
-    }
-  };
-
-  // Prepare chart data with enhanced error checking
-  const processedData = chartDataArray.map((item: any, index: number) => {
-    const name = getName(item, `Item ${index + 1}`);
-    const value = safeNumericValue(getValue(item, yKey || 'value', 0));
-    
-    console.log(`🔧 Processing chart data item ${index}:`, {
-      original: item,
-      name,
-      value,
-      type: typeof value
-    });
-    
-    return {
-      name,
-      value,
-      x: getValue(item, xKey || 'name', name),
-      y: value
     };
-  });
 
-  switch (chartType) {
+    switch (chartType) {
     case "bar":
       const barOptions = {
         ...baseConfig,
@@ -392,7 +453,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       }];
 
       try {
-        return <Chart options={barOptions} series={barSeries} type="bar" height={520} />;
+        return (
+          <ChartWithInsights chartData={chartData}>
+            <Chart options={barOptions} series={barSeries} type="bar" height={520} />
+          </ChartWithInsights>
+        );
       } catch (chartError) {
         console.error('🔧 ApexCharts bar chart error:', chartError, 'Data:', barSeries);
         handleChartError(`Bar chart rendering failed: ${chartError}`);
@@ -400,118 +465,246 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       }
 
     case "line":
-      const lineOptions = {
-        ...baseConfig,
-        chart: {
-          ...baseConfig.chart,
-          type: 'line' as const,
-          events: {
-            dataPointSelection: function(event: any, chartContext: any, config: any) {
-              console.log('Line chart dataPointSelection triggered:', config);
-              if (onChartClick) {
-                const dataPoint = {
-                  seriesIndex: config.seriesIndex,
-                  dataPointIndex: config.dataPointIndex,
-                  value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
-                  label: config.w.config.xaxis.categories[config.dataPointIndex],
-                  category: config.w.config.xaxis.categories[config.dataPointIndex]
-                };
-                console.log('Line chart calling onChartClick with:', dataPoint);
-                onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
-              }
-            },
-            markerClick: function(event: any, chartContext: any, config: any) {
-              console.log('Line chart markerClick triggered:', config);
-              if (onChartClick) {
-                const dataPoint = {
-                  seriesIndex: config.seriesIndex,
-                  dataPointIndex: config.dataPointIndex,
-                  value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
-                  label: config.w.config.xaxis.categories[config.dataPointIndex],
-                  category: config.w.config.xaxis.categories[config.dataPointIndex]
-                };
-                onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
+      // Handle both simple array and complex data formats for line charts
+      let lineOptions: any;
+      let lineSeries: any[];
+
+      if (isComplexFormat && complexData) {
+        // Use complex data format from new backend
+        lineOptions = {
+          ...baseConfig,
+          chart: {
+            ...baseConfig.chart,
+            type: 'line' as const,
+            events: {
+              dataPointSelection: function(event: any, chartContext: any, config: any) {
+                console.log('Line chart dataPointSelection triggered:', config);
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  console.log('Line chart calling onChartClick with:', dataPoint);
+                  onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
+                }
+              },
+              markerClick: function(event: any, chartContext: any, config: any) {
+                console.log('Line chart markerClick triggered:', config);
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
+                }
               }
             }
-          }
-        },
-        xaxis: {
-          categories: processedData.map(item => item.name),
-          labels: {
-            style: {
-              fontSize: '12px',
-              fontWeight: 'bold'
-            },
-            maxHeight: 120,
-            rotate: -45
-          }
-        },
-        yaxis: {
-          labels: {
-            style: {
-              fontSize: '12px'
-            }
-          }
-        },
-        title: {
-          text: chartTitle,
-          style: {
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: isDark ? '#ffffff' : '#333333'
           },
-          margin: 10
-        },
-        grid: {
-          padding: {
-            top: 20,
-            right: 20,
-            bottom: 20,
-            left: 20
+          xaxis: {
+            categories: complexData.labels,
+            labels: {
+              style: {
+                fontSize: '12px',
+                fontWeight: 'bold'
+              },
+              maxHeight: 120,
+              rotate: -45
+            }
+          },
+          yaxis: {
+            labels: {
+              style: {
+                fontSize: '12px'
+              }
+            }
+          },
+          title: {
+            text: chartTitle,
+            style: {
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: isDark ? '#ffffff' : '#333333'
+            },
+            margin: 10
+          },
+          grid: {
+            padding: {
+              top: 20,
+              right: 20,
+              bottom: 20,
+              left: 20
+            }
+          },
+          stroke: {
+            curve: 'smooth' as const,
+            width: 3
+          },
+          fill: {
+            type: 'gradient',
+            gradient: {
+              shade: 'light',
+              type: 'vertical',
+              shadeIntensity: 0.3,
+              inverseColors: false,
+              opacityFrom: 0.4,
+              opacityTo: 0.1,
+              stops: [0, 100]
+            }
+          },
+          markers: {
+            size: 8,
+            strokeWidth: 3,
+            strokeColors: '#fff',
+            fillOpacity: 1,
+            hover: {
+              size: 12,
+              sizeOffset: 3
+            }
+          },
+          tooltip: {
+            shared: false,
+            intersect: true
           }
-        },
-        colors: dynamicColors, // Apply dynamic colors
-        stroke: {
-          curve: 'smooth' as const,
-          width: 3,
-          colors: dynamicColors
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shade: 'light',
-            type: 'vertical',
-            shadeIntensity: 0.3,
-            gradientToColors: gradientColors,
-            inverseColors: false,
-            opacityFrom: 0.4,
-            opacityTo: 0.1,
-            stops: [0, 100]
-          }
-        },
-        markers: {
-          size: 8,
-          strokeWidth: 3,
-          strokeColors: '#fff',
-          fillOpacity: 1,
+        };
+
+        // Create series from complex data format
+        lineSeries = complexData.datasets.map((dataset, index) => ({
+          name: dataset.label,
+          data: dataset.data,
+          color: dataset.color || dynamicColors[index % dynamicColors.length]
+        }));
+
+      } else {
+        // Use simple array format (legacy)
+        lineOptions = {
+          ...baseConfig,
+          chart: {
+            ...baseConfig.chart,
+            type: 'line' as const,
+            events: {
+              dataPointSelection: function(event: any, chartContext: any, config: any) {
+                console.log('Line chart dataPointSelection triggered:', config);
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  console.log('Line chart calling onChartClick with:', dataPoint);
+                  onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
+                }
+              },
+              markerClick: function(event: any, chartContext: any, config: any) {
+                console.log('Line chart markerClick triggered:', config);
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  onChartClick(dataPoint, 'line', chartTitle || 'Line Chart');
+                }
+              }
+            }
+          },
+          xaxis: {
+            categories: processedData.map(item => item.name),
+            labels: {
+              style: {
+                fontSize: '12px',
+                fontWeight: 'bold'
+              },
+              maxHeight: 120,
+              rotate: -45
+            }
+          },
+          yaxis: {
+            labels: {
+              style: {
+                fontSize: '12px'
+              }
+            }
+          },
+          title: {
+            text: chartTitle,
+            style: {
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: isDark ? '#ffffff' : '#333333'
+            },
+            margin: 10
+          },
+          grid: {
+            padding: {
+              top: 20,
+              right: 20,
+              bottom: 20,
+              left: 20
+            }
+          },
           colors: dynamicColors,
-          hover: {
-            size: 12,
-            sizeOffset: 3
+          stroke: {
+            curve: 'smooth' as const,
+            width: 3,
+            colors: dynamicColors
+          },
+          fill: {
+            type: 'gradient',
+            gradient: {
+              shade: 'light',
+              type: 'vertical',
+              shadeIntensity: 0.3,
+              gradientToColors: gradientColors,
+              inverseColors: false,
+              opacityFrom: 0.4,
+              opacityTo: 0.1,
+              stops: [0, 100]
+            }
+          },
+          markers: {
+            size: 8,
+            strokeWidth: 3,
+            strokeColors: '#fff',
+            fillOpacity: 1,
+            colors: dynamicColors,
+            hover: {
+              size: 12,
+              sizeOffset: 3
+            }
+          },
+          tooltip: {
+            shared: false,
+            intersect: true
           }
-        },
-        tooltip: {
-          shared: false,
-          intersect: true
-        }
-      };
+        };
 
-      const lineSeries = [{
-        name: 'Values',
-        data: processedData.map(item => item.value)
-      }];
+        lineSeries = [{
+          name: 'Values',
+          data: processedData.map(item => item.value)
+        }];
+      }
 
-      return <Chart options={lineOptions} series={lineSeries} type="line" height={520} />;
+      try {
+        return (
+          <ChartWithInsights chartData={chartData}>
+            <Chart options={lineOptions} series={lineSeries} type="line" height={520} />
+          </ChartWithInsights>
+        );
+      } catch (chartError) {
+        console.error('🔧 ApexCharts line chart error:', chartError, 'Data:', lineSeries);
+        handleChartError(`Line chart rendering failed: ${chartError}`);
+        return null;
+      }
 
     case "donut":
       const donutOptions = {
@@ -654,9 +847,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       const donutData = processedData.map(item => item.value);
 
       return (
-        <div style={{ width: '100%', maxWidth: 640, minHeight: 420, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Chart options={donutOptions} series={donutData} type="donut" height={420} width={"100%"} />
-        </div>
+        <ChartWithInsights chartData={chartData}>
+          <div style={{ width: '100%', maxWidth: 640, minHeight: 420, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Chart options={donutOptions} series={donutData} type="donut" height={420} width={"100%"} />
+          </div>
+        </ChartWithInsights>
       );
 
     case "pie":
@@ -886,13 +1081,13 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         },
         xaxis: {
           title: {
-            text: xKey || 'X Values'
+            text: 'X Values'
           },
           type: 'numeric' as const
         },
         yaxis: {
           title: {
-            text: yKey || 'Y Values'
+            text: 'Y Values'
           }
         }
       };
@@ -905,47 +1100,149 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       return <Chart options={scatterOptions} series={scatterSeries} type="scatter" height={520} />;
 
     case "radar":
-      const radarOptions = {
-        ...baseConfig,
-        chart: {
-          ...baseConfig.chart,
-          type: 'radar' as const,
-          events: {
-            ...baseConfig.chart.events,
-            dataPointSelection: function(event: any, chartContext: any, config: any) {
-              if (onChartClick) {
-                const dataPoint = {
-                  seriesIndex: config.seriesIndex,
-                  dataPointIndex: config.dataPointIndex,
-                  value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
-                  label: config.w.config.xaxis.categories[config.dataPointIndex],
-                  category: config.w.config.xaxis.categories[config.dataPointIndex]
-                };
-                onChartClick(dataPoint, 'radar', chartTitle || 'Radar Chart');
+      // Handle both simple array and complex data formats for radar charts
+      let radarOptions: any;
+      let radarSeries: any[];
+
+      if (isComplexFormat && complexData) {
+        // Use complex data format from new backend
+        radarOptions = {
+          ...baseConfig,
+          chart: {
+            ...baseConfig.chart,
+            type: 'radar' as const,
+            events: {
+              ...baseConfig.chart.events,
+              dataPointSelection: function(event: any, chartContext: any, config: any) {
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  onChartClick(dataPoint, 'radar', chartTitle || 'Radar Chart');
+                }
               }
             }
-          }
-        },
-        title: {
-          text: chartTitle,
-          style: {
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: isDark ? '#ffffff' : '#333333'
           },
-          margin: 10
-        },
-        xaxis: {
-          categories: processedData.map(item => item.name)
-        }
-      };
+          title: {
+            text: chartTitle,
+            style: {
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: isDark ? '#ffffff' : '#333333'
+            },
+            margin: 10
+          },
+          xaxis: {
+            categories: complexData.labels
+          },
+          plotOptions: {
+            radar: {
+              size: 150,
+              polygons: {
+                strokeColors: isDark ? '#374151' : '#e5e7eb',
+                fill: {
+                  colors: [isDark ? '#1f2937' : '#f9fafb', isDark ? '#111827' : '#f3f4f6']
+                }
+              }
+            }
+          },
+          colors: complexData.datasets.map((dataset, index) => 
+            dataset.color || dynamicColors[index % dynamicColors.length]
+          ),
+          markers: {
+            size: 6,
+            strokeWidth: 2,
+            fillOpacity: 1,
+          },
+          fill: {
+            opacity: 0.25
+          }
+        };
 
-      const radarSeries = [{
-        name: 'Values',
-        data: processedData.map(item => item.value)
-      }];
+        // Create series from complex data format
+        radarSeries = complexData.datasets.map((dataset, index) => ({
+          name: dataset.label,
+          data: dataset.data,
+        }));
 
-      return <Chart options={radarOptions} series={radarSeries} type="radar" height={520} />;
+      } else {
+        // Use simple array format (legacy)
+        radarOptions = {
+          ...baseConfig,
+          chart: {
+            ...baseConfig.chart,
+            type: 'radar' as const,
+            events: {
+              ...baseConfig.chart.events,
+              dataPointSelection: function(event: any, chartContext: any, config: any) {
+                if (onChartClick) {
+                  const dataPoint = {
+                    seriesIndex: config.seriesIndex,
+                    dataPointIndex: config.dataPointIndex,
+                    value: config.w.config.series[config.seriesIndex].data[config.dataPointIndex],
+                    label: config.w.config.xaxis.categories[config.dataPointIndex],
+                    category: config.w.config.xaxis.categories[config.dataPointIndex]
+                  };
+                  onChartClick(dataPoint, 'radar', chartTitle || 'Radar Chart');
+                }
+              }
+            }
+          },
+          title: {
+            text: chartTitle,
+            style: {
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: isDark ? '#ffffff' : '#333333'
+            },
+            margin: 10
+          },
+          xaxis: {
+            categories: processedData.map(item => item.name)
+          },
+          plotOptions: {
+            radar: {
+              size: 150,
+              polygons: {
+                strokeColors: isDark ? '#374151' : '#e5e7eb',
+                fill: {
+                  colors: [isDark ? '#1f2937' : '#f9fafb', isDark ? '#111827' : '#f3f4f6']
+                }
+              }
+            }
+          },
+          colors: dynamicColors,
+          markers: {
+            size: 6,
+            strokeWidth: 2,
+            fillOpacity: 1,
+          },
+          fill: {
+            opacity: 0.25
+          }
+        };
+
+        radarSeries = [{
+          name: 'Values',
+          data: processedData.map(item => item.value)
+        }];
+      }
+
+      try {
+        return (
+          <ChartWithInsights chartData={chartData}>
+            <Chart options={radarOptions} series={radarSeries} type="radar" height={520} />
+          </ChartWithInsights>
+        );
+      } catch (chartError) {
+        console.error('🔧 ApexCharts radar chart error:', chartError, 'Data:', radarSeries);
+        handleChartError(`Radar chart rendering failed: ${chartError}`);
+        return null;
+      }
 
     case "heatmap":
       const heatmapOptions = {
@@ -1223,40 +1520,42 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       }));
 
       return (
-        <div className="word-cloud-container h-[420px] p-6 border rounded-xl bg-muted/20">
-          <h3 className="text-xl font-semibold text-center mb-6">{chartTitle || 'Word Cloud'}</h3>
-          <div className="flex flex-wrap gap-3 justify-center items-center h-[340px] overflow-y-auto">
-            {wordCloudData.map((word: any, index: number) => {
-              const size = Math.max(16, Math.min(44, (word.value / Math.max(...wordCloudData.map((w: any) => w.value))) * 28 + 16));
-              const opacity = Math.max(0.6, word.value / Math.max(...wordCloudData.map((w: any) => w.value)));
-              return (
-                <span
-                  key={index}
-                  className="cursor-pointer transition-all duration-200 hover:scale-110 inline-block m-1 p-2 rounded"
-                  style={{ 
-                    fontSize: `${size}px`, 
-                    opacity: opacity,
-                    color: dynamicColors[index % dynamicColors.length]
-                  }}
-                  onClick={() => {
-                    if (onChartClick) {
-                      const dataPoint = {
-                        label: word.text,
-                        value: word.value,
-                        category: word.category,
-                        seriesIndex: 0,
-                        dataPointIndex: index
-                      };
-                      onChartClick(dataPoint, 'wordcloud', chartTitle || 'Word Cloud');
-                    }
-                  }}
-                >
-                  {word.text}
-                </span>
-              );
-            })}
+        <ChartWithInsights chartData={chartData}>
+          <div className="word-cloud-container h-[420px] p-6 border rounded-xl bg-muted/20">
+            <h3 className="text-xl font-semibold text-center mb-6">{chartTitle || 'Word Cloud'}</h3>
+            <div className="flex flex-wrap gap-3 justify-center items-center h-[340px] overflow-y-auto">
+              {wordCloudData.map((word: any, index: number) => {
+                const size = Math.max(16, Math.min(44, (word.value / Math.max(...wordCloudData.map((w: any) => w.value))) * 28 + 16));
+                const opacity = Math.max(0.6, word.value / Math.max(...wordCloudData.map((w: any) => w.value)));
+                return (
+                  <span
+                    key={index}
+                    className="cursor-pointer transition-all duration-200 hover:scale-110 inline-block m-1 p-2 rounded"
+                    style={{ 
+                      fontSize: `${size}px`, 
+                      opacity: opacity,
+                      color: dynamicColors[index % dynamicColors.length]
+                    }}
+                    onClick={() => {
+                      if (onChartClick) {
+                        const dataPoint = {
+                          label: word.text,
+                          value: word.value,
+                          category: word.category,
+                          seriesIndex: 0,
+                          dataPointIndex: index
+                        };
+                        onChartClick(dataPoint, 'wordcloud', chartTitle || 'Word Cloud');
+                      }
+                    }}
+                  >
+                    {word.text}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </ChartWithInsights>
       );
 
     default:
