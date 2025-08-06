@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CacheManager } from '@/utils/cacheUtils';
 
 // Types for application state
 interface Message {
@@ -294,21 +295,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Load dashboard data
   const loadDashboardData = async (forceRefresh = false, topic?: string, dateRange?: { from: Date; to: Date }) => {
-    const dateKey = dateRange ? `${dateRange.from.toISOString().split('T')[0]}-${dateRange.to.toISOString().split('T')[0]}` : 'default';
-    const cacheKey = topic && topic !== 'general' ? `dashboard-data-${topic}-${dateKey}` : `dashboard-data-${dateKey}`;
-    const cached = state.cachedResponses.get(cacheKey);
+    const cacheKey = CacheManager.generateCacheKey('dashboard', topic, dateRange);
+    const memoryCached = state.cachedResponses.get(cacheKey);
     
-    // Use cache only if not forcing refresh and cache is valid
-    if (!forceRefresh && cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
-      // Check if cached data has any charts - if not, refresh anyway
-      const hasValidCharts = cached.data?.charts && Object.keys(cached.data.charts).length > 0;
+    // Check memory cache first
+    if (!forceRefresh && memoryCached && Date.now() - memoryCached.timestamp < 5 * 60 * 1000) {
+      const hasValidCharts = memoryCached.data?.charts && Object.keys(memoryCached.data.charts).length > 0;
       if (hasValidCharts) {
-        console.log('📊 Using cached dashboard data:', {
-          chartCount: Object.keys(cached.data.charts).length,
-          chartKeys: Object.keys(cached.data.charts),
+        console.log('🧠 Using memory cached dashboard data:', {
+          chartCount: Object.keys(memoryCached.data.charts).length,
+          chartKeys: Object.keys(memoryCached.data.charts),
           topic: topic || 'general'
         });
-        dispatch({ type: 'SET_DASHBOARD_DATA', payload: cached.data });
+        dispatch({ type: 'SET_DASHBOARD_DATA', payload: memoryCached.data });
+        return;
+      }
+    }
+    
+    // Check localStorage cache if memory cache missed
+    if (!forceRefresh) {
+      const localCached = CacheManager.getFromCache(cacheKey);
+      if (localCached?.charts && Object.keys(localCached.charts).length > 0) {
+        console.log('� Using localStorage cached dashboard data:', {
+          chartCount: Object.keys(localCached.charts).length,
+          chartKeys: Object.keys(localCached.charts),
+          topic: topic || 'general'
+        });
+        dispatch({ type: 'SET_DASHBOARD_DATA', payload: localCached });
+        
+        // Also update memory cache
+        dispatch({ 
+          type: 'CACHE_RESPONSE', 
+          payload: { 
+            key: cacheKey, 
+            data: { data: localCached, timestamp: Date.now() } 
+          } 
+        });
         return;
       }
     }
@@ -330,20 +352,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch(url);
       if (response.ok) {
         const dashboardData = await response.json();
-        console.log('📊 Received new dashboard data:', {
+        console.log('📊 Received new dashboard data from API:', {
           chartCount: dashboardData?.charts ? Object.keys(dashboardData.charts).length : 0,
           chartKeys: dashboardData?.charts ? Object.keys(dashboardData.charts) : [],
           forceRefresh,
           topic: topic || 'general'
         });
+        
         dispatch({ type: 'SET_DASHBOARD_DATA', payload: dashboardData });
+        
+        // Cache in both memory and localStorage
+        const cacheData = { data: dashboardData, timestamp: Date.now() };
         dispatch({ 
           type: 'CACHE_RESPONSE', 
           payload: { 
             key: cacheKey, 
-            data: { data: dashboardData, timestamp: Date.now() } 
+            data: cacheData 
           } 
         });
+        CacheManager.saveToCache(
+          cacheKey, 
+          dashboardData, 
+          topic || 'general', 
+          dateRange ? `${dateRange.from.toISOString().split('T')[0]}-${dateRange.to.toISOString().split('T')[0]}` : 'default'
+        );
       } else {
         dispatch({ type: 'SET_DASHBOARD_LOADING', payload: false });
       }
@@ -355,13 +387,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Load word cloud data from OpenAI assistant
   const loadWordCloudData = async (forceRefresh = false) => {
-    const cacheKey = 'word-cloud-data';
-    const cached = state.cachedResponses.get(cacheKey);
+    const cacheKey = CacheManager.generateCacheKey('wordcloud');
+    const memoryCached = state.cachedResponses.get(cacheKey);
     
-    // Use cache only if not forcing refresh and cache is valid
-    if (!forceRefresh && cached && Date.now() - cached.timestamp < 10 * 60 * 1000) { // 10 min cache
-      dispatch({ type: 'SET_WORD_CLOUD_DATA', payload: cached.data });
+    // Check memory cache first
+    if (!forceRefresh && memoryCached && Date.now() - memoryCached.timestamp < 10 * 60 * 1000) { // 10 min cache
+      console.log('🧠 Using memory cached word cloud data');
+      dispatch({ type: 'SET_WORD_CLOUD_DATA', payload: memoryCached.data });
       return;
+    }
+    
+    // Check localStorage cache if memory cache missed
+    if (!forceRefresh) {
+      const localCached = CacheManager.getFromCache(cacheKey);
+      if (localCached) {
+        console.log('💾 Using localStorage cached word cloud data');
+        dispatch({ type: 'SET_WORD_CLOUD_DATA', payload: localCached });
+        
+        // Also update memory cache
+        dispatch({ 
+          type: 'CACHE_RESPONSE', 
+          payload: { 
+            key: cacheKey, 
+            data: { data: localCached, timestamp: Date.now() } 
+          } 
+        });
+        return;
+      }
     }
 
     try {
@@ -371,14 +423,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch('/api/word-cloud-data');
       if (response.ok) {
         const wordCloudData = await response.json();
+        console.log('☁️ Received new word cloud data from API');
         dispatch({ type: 'SET_WORD_CLOUD_DATA', payload: wordCloudData });
+        
+        // Cache in both memory and localStorage
+        const cacheData = { data: wordCloudData, timestamp: Date.now() };
         dispatch({ 
           type: 'CACHE_RESPONSE', 
           payload: { 
             key: cacheKey, 
-            data: { data: wordCloudData, timestamp: Date.now() } 
+            data: cacheData 
           } 
         });
+        CacheManager.saveToCache(cacheKey, wordCloudData);
       } else {
         dispatch({ type: 'SET_WORD_CLOUD_LOADING', payload: false });
       }

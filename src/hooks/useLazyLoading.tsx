@@ -43,6 +43,10 @@ export const useLazyLoading = ({
 
   const [hasStarted, setHasStarted] = useState(false);
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
+  
+  // Track previous topic and date range for comparison
+  const prevTopic = useRef(selectedTopic);
+  const prevDateRange = useRef(selectedDateRange);
 
   // Clear timeouts on unmount
   useEffect(() => {
@@ -50,6 +54,39 @@ export const useLazyLoading = ({
       timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
     };
   }, []);
+
+  // Reset when topic or date range changes
+  useEffect(() => {
+    const topicChanged = prevTopic.current !== selectedTopic;
+    const dateChanged = prevDateRange.current?.label !== selectedDateRange?.label;
+    
+    if ((topicChanged || dateChanged) && hasStarted) {
+      console.log('🔄 Topic or date range changed, resetting lazy loading state...', {
+        topicChanged: topicChanged ? `${prevTopic.current} → ${selectedTopic}` : false,
+        dateChanged: dateChanged ? `${prevDateRange.current?.label} → ${selectedDateRange?.label}` : false,
+      });
+      
+      // Clear timeouts
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current = [];
+      
+      // Reset loading state but keep hasStarted to trigger reload
+      setLoadingState({
+        isLoadingMetrics: false,
+        isLoadingCharts: false,
+        isLoadingWordCloud: false,
+        metricsLoaded: false,
+        chartsLoaded: false,
+        wordCloudLoaded: false,
+        hasError: false,
+        isComplete: false
+      });
+      
+      // Update refs
+      prevTopic.current = selectedTopic;
+      prevDateRange.current = selectedDateRange;
+    }
+  }, [selectedTopic, selectedDateRange, hasStarted]);
 
   // Reset loading state when topic or date range changes
   useEffect(() => {
@@ -85,7 +122,8 @@ export const useLazyLoading = ({
       setLoadingState(prev => ({ ...prev, isLoadingMetrics: true, hasError: false }));
       
       console.log('📊 Loading metrics data...');
-      await loadDashboardData(true); // Force refresh
+      // Use cached data when possible - only force refresh when explicitly requested
+      await loadDashboardData(false, selectedTopic, selectedDateRange); // Don't force refresh
       
       setLoadingState(prev => ({
         ...prev,
@@ -150,7 +188,8 @@ export const useLazyLoading = ({
         setLoadingState(prev => ({ ...prev, isLoadingWordCloud: true }));
         
         console.log('☁️ Loading word cloud data...');
-        await loadWordCloudData(true); // Force refresh
+        // Use cached data when possible - only force refresh when explicitly requested
+        await loadWordCloudData(false); // Don't force refresh
         
         setLoadingState(prev => ({
           ...prev,
@@ -222,10 +261,62 @@ export const useLazyLoading = ({
     
     setHasStarted(false);
     
-    // Start loading again
-    setTimeout(() => {
-      setHasStarted(true);
-    }, 100);
+    try {
+      // Force refresh all data immediately
+      setLoadingState(prev => ({ ...prev, isLoadingMetrics: true }));
+      
+      console.log('📊 Force loading dashboard data...');
+      await loadDashboardData(true, selectedTopic, selectedDateRange); // Force refresh
+      
+      setLoadingState(prev => ({
+        ...prev,
+        isLoadingMetrics: false,
+        metricsLoaded: true,
+        isLoadingCharts: true
+      }));
+      
+      onMetricsLoaded?.();
+      
+      // Small delay then load charts (they come with dashboard data)
+      setTimeout(() => {
+        setLoadingState(prev => ({
+          ...prev,
+          isLoadingCharts: false,
+          chartsLoaded: true,
+          isLoadingWordCloud: true
+        }));
+        
+        onChartsLoaded?.();
+        
+        // Load word cloud
+        loadWordCloudData(true).then(() => { // Force refresh
+          setLoadingState(prev => ({
+            ...prev,
+            isLoadingWordCloud: false,
+            wordCloudLoaded: true,
+            isComplete: true
+          }));
+          onWordCloudLoaded?.();
+        }).catch(error => {
+          console.error('❌ Error force loading word cloud:', error);
+          setLoadingState(prev => ({
+            ...prev,
+            isLoadingWordCloud: false,
+            hasError: true,
+            errorMessage: 'Failed to force refresh word cloud data'
+          }));
+        });
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Error force refreshing:', error);
+      setLoadingState(prev => ({
+        ...prev,
+        isLoadingMetrics: false,
+        hasError: true,
+        errorMessage: 'Failed to force refresh data'
+      }));
+    }
   };
 
   return {

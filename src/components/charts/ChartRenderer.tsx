@@ -955,9 +955,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       const pieData = processedData.map(item => item.value);
 
       return (
-        <div style={{ width: '100%', maxWidth: 640, minHeight: 420, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Chart options={pieOptions} series={pieData} type="pie" height={420} width={"100%"} />
-        </div>
+        <ChartWithInsights chartData={chartData}>
+          <div style={{ width: '100%', maxWidth: 640, minHeight: 420, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Chart options={pieOptions} series={pieData} type="pie" height={420} width={"100%"} />
+          </div>
+        </ChartWithInsights>
       );
 
     case "area":
@@ -1032,7 +1034,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         data: processedData.map(item => item.value)
       }];
 
-      return <Chart options={areaOptions} series={areaSeries} type="area" height={520} />;
+      return (
+        <ChartWithInsights chartData={chartData}>
+          <Chart options={areaOptions} series={areaSeries} type="area" height={520} />
+        </ChartWithInsights>
+      );
 
     case "scatter":
       const scatterOptions = {
@@ -1097,7 +1103,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         data: processedData.map(item => [Number(item.x) || 0, item.y])
       }];
 
-      return <Chart options={scatterOptions} series={scatterSeries} type="scatter" height={520} />;
+      return (
+        <ChartWithInsights chartData={chartData}>
+          <Chart options={scatterOptions} series={scatterSeries} type="scatter" height={520} />
+        </ChartWithInsights>
+      );
 
     case "radar":
       // Handle both simple array and complex data formats for radar charts
@@ -1375,7 +1385,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         }
       })();
 
-      return <Chart options={heatmapOptions} series={heatmapSeries} type="heatmap" height={420} />;
+      return (
+        <ChartWithInsights chartData={chartData}>
+          <Chart options={heatmapOptions} series={heatmapSeries} type="heatmap" height={420} />
+        </ChartWithInsights>
+      );
 
     case "treemap":
       const treemapOptions = {
@@ -1448,7 +1462,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         }))
       }];
 
-      return <Chart options={treemapOptions} series={treemapSeries} type="treemap" height={420} />;
+      return (
+        <ChartWithInsights chartData={chartData}>
+          <Chart options={treemapOptions} series={treemapSeries} type="treemap" height={420} />
+        </ChartWithInsights>
+      );
 
     case "funnel":
       const funnelOptions = {
@@ -1509,7 +1527,11 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         data: processedData.map(item => item.value)
       }];
 
-      return <Chart options={funnelOptions} series={funnelSeries} type="bar" height={420} />;
+      return (
+        <ChartWithInsights chartData={chartData}>
+          <Chart options={funnelOptions} series={funnelSeries} type="bar" height={420} />
+        </ChartWithInsights>
+      );
 
     case "wordcloud":
       // For word cloud, we'll display a simple representation since ApexCharts doesn't have native word cloud

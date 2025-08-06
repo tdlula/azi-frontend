@@ -1,4 +1,4 @@
-import { TrendingUp, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap, Settings, Info, FileText } from "lucide-react";
+import { TrendingUp, Target, Activity, BarChart3, Filter, ChevronDown, Radio, Award, Clock, Zap, Settings, Info, FileText, Trash2 } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import ChartRenderer from "@/components/charts/ChartRenderer";
@@ -10,7 +10,6 @@ import MetricsSection from "@/components/MetricsSection";
 import ChartsSection from "@/components/ChartsSection";
 import WordCloudSection from "@/components/WordCloudSection";
 import useLazyLoading from "@/hooks/useLazyLoading";
-import { exportToPDF } from "@/utils/pdfExport";
 import { useState, useEffect, useRef } from "react";
 import { DashboardSchema } from "@/schemas/dashboardSchema";
 import html2canvas from "html2canvas";
@@ -21,6 +20,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { testFrontendBackendIntegration } from "@/utils/integrationTest";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { CacheManager } from "@/utils/cacheUtils";
 
 export default function DashboardMinimal() {
   const { state } = useAppContext();
@@ -47,6 +47,9 @@ export default function DashboardMinimal() {
   // Filter state
   const [selectedTopic, setSelectedTopic] = useState("shoprite");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Settings dropdown state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // Date range state
   const [selectedDateRange, setSelectedDateRange] = useState(getDefaultDateRange());
@@ -303,7 +306,21 @@ export default function DashboardMinimal() {
         };
       }
       
+      // IMPORTANT: Preserve AI insights from backend
+      if (chart.aiInsight) {
+        normalizedChart.aiInsight = chart.aiInsight;
+      }
+      if (chart.sourceInfo) {
+        normalizedChart.sourceInfo = chart.sourceInfo;
+      }
+      
       console.log('🔧 Normalized chart data:', normalizedChart);
+      console.log('🔍 AI insights preserved:', {
+        hasAiInsight: !!normalizedChart.aiInsight,
+        hasSourceInfo: !!normalizedChart.sourceInfo,
+        aiInsight: normalizedChart.aiInsight,
+        sourceInfo: normalizedChart.sourceInfo
+      });
       return normalizedChart;
       
     } catch (error) {
@@ -356,20 +373,29 @@ export default function DashboardMinimal() {
           setIsFilterOpen(false);
         }
       }
+      if (isSettingsOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.settings-dropdown')) {
+          setIsSettingsOpen(false);
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isFilterOpen]);
+  }, [isFilterOpen, isSettingsOpen]);
 
   // Close dropdown when loading starts
   useEffect(() => {
     if ((loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud) && isFilterOpen) {
       setIsFilterOpen(false);
     }
-  }, [loadingState.isLoadingMetrics, loadingState.isLoadingCharts, loadingState.isLoadingWordCloud, isFilterOpen]);
+    if ((loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud) && isSettingsOpen) {
+      setIsSettingsOpen(false);
+    }
+  }, [loadingState.isLoadingMetrics, loadingState.isLoadingCharts, loadingState.isLoadingWordCloud, isFilterOpen, isSettingsOpen]);
 
   // Setup integration test in browser console (development aid)
   useEffect(() => {
@@ -434,6 +460,20 @@ export default function DashboardMinimal() {
     } catch (error) {
       console.error('Error refreshing data:', error);
       alert('Failed to refresh data. Please try again.');
+    }
+  };
+
+  const clearCache = () => {
+    try {
+      console.log('🗑️ Clearing all dashboard cache...');
+      CacheManager.clearAllCache();
+      
+      // Show cache stats after clearing
+      const stats = CacheManager.getCacheStats();
+      alert(`Cache cleared successfully!\n\nRemaining items: ${stats.count}\nTotal size: ${(stats.totalSize / 1024).toFixed(2)} KB`);
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      alert('Failed to clear cache. Please try again.');
     }
   };
 
@@ -678,12 +718,12 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
                 title="Filter dashboard content by specific topics like Shoprite (default), Telkom, ANC, or view all general content"
-                className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors ${
+                className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors text-foreground ${
                   loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 <Filter className="w-4 h-4" />
-                <span>{topicsData.find(topic => topic.value === selectedTopic)?.label || "Shoprite"}</span>
+                <span className="text-foreground font-medium">{topicsData.find(topic => topic.value === selectedTopic)?.label || "Shoprite"}</span>
                 {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                 ) : (
@@ -723,55 +763,65 @@ Return analysis with specific transcript excerpts, quantified insights, and data
               disabled={isDashboardLoading}
             />
             
-            <button
-              onClick={generateReport}
-              disabled={isDashboardLoading || isGeneratingReport}
-              title="Generate comprehensive PDF report with all dashboard data, charts, and insights"
-              className={`flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
-                isDashboardLoading || isGeneratingReport ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              {isGeneratingReport ? 'Generating...' : 'Generate Report'}
-            </button>
-            <button
-              onClick={async () => {
-                if (reportRef.current && !isGeneratingReport) {
-                  setIsGeneratingReport(true);
-                  try {
-                    const filename = `radio-analytics-report-${selectedTopic}-${selectedDateRange.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-                    await exportToPDF(reportRef, {
-                      filename,
-                      format: 'a4',
-                      orientation: 'portrait'
-                    });
-                  } catch (error) {
-                    console.error('Error generating PDF:', error);
-                    alert('Failed to generate PDF. Please try again.');
-                  } finally {
-                    setIsGeneratingReport(false);
-                  }
-                }
-              }}
-              disabled={isDashboardLoading || isGeneratingReport}
-              title="Generate PDF report using component-based approach"
-              className={`flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors ${
-                isDashboardLoading || isGeneratingReport ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              {isGeneratingReport ? 'Creating PDF...' : 'PDF Export'}
-            </button>
-            <button
-              onClick={forceRefresh}
-              disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
-              title="Force refresh all dashboard data and charts by bypassing cache and requesting fresh AI-generated insights"
-              className={`px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors ${
-                loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'Updating...' : 'Force Refresh'}
-            </button>
+            {/* Settings Dropdown */}
+            <div className="relative settings-dropdown">
+              <button
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
+                title="Dashboard settings and actions"
+                className={`flex items-center gap-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors ${
+                  loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+                {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white ml-1"></div>
+                ) : (
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                )}
+              </button>
+              
+              {isSettingsOpen && !(loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud) && (
+                <div className="absolute right-0 mt-2 w-56 bg-background border border-border rounded-md shadow-lg z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        generateReport();
+                        setIsSettingsOpen(false);
+                      }}
+                      disabled={isDashboardLoading || isGeneratingReport}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceRefresh();
+                        setIsSettingsOpen(false);
+                      }}
+                      disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                    >
+                      <Activity className="w-4 h-4" />
+                      {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'Updating...' : 'Force Refresh'}
+                    </button>
+                    <div className="border-t border-border my-1"></div>
+                    <button
+                      onClick={() => {
+                        clearCache();
+                        setIsSettingsOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Clear Cache
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div title="Access additional dashboard options including downloads, sharing, theme settings, and navigation">
               <HamburgerMenu 
                 onScreenshot={downloadDashboard}

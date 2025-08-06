@@ -113,12 +113,12 @@ export default function DateRangePicker({ selectedRange, onRangeChange, disabled
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
         title="Select date range to filter dashboard data by specific time periods"
-        className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors ${
+        className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors text-foreground ${
           disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
       >
         <CalendarDays className="w-4 h-4" />
-        <span className="min-w-0 truncate">{formatRangeDisplay(selectedRange)}</span>
+        <span className="min-w-0 truncate text-foreground font-medium">{formatRangeDisplay(selectedRange)}</span>
         {disabled ? (
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
         ) : (
