@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 const isDev = process.env.NODE_ENV !== 'production' && process.env.npm_lifecycle_event !== 'build';
-const devBackend = 'http://localhost:5000';
+const devBackend = 'http://localhost:5001';
 const prodBackend = 'http://129.151.191.161:7000';
 
 export default defineConfig({
