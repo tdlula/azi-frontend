@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database, AlertCircle } from "lucide-react";
+import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database, AlertCircle, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ExportDropdown from "@/components/ui/export-dropdown";

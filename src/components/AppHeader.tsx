@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { BarChart3, Settings } from "lucide-react";
 import NetworkHealthIcon from "@/components/NetworkHealthIcon";
+import AuthHeader from "@/components/AuthHeader";
 import { Link, useLocation } from "wouter";
 import { useAppConfig } from "@/hooks/useAppConfig";
 
@@ -48,6 +49,9 @@ export default function AppHeader() {
         <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
           {/* Network Health Icon */}
           <NetworkHealthIcon />
+          
+          {/* Authentication Header */}
+          <AuthHeader />
         </div>
       </div>
     </div>
