@@ -11,7 +11,8 @@ interface MessageProps {
 
 export default function Message({ message, onChartExpand }: MessageProps) {
   const isUser = message.role === "user";
-  const chartData = message.chartData as any;
+  // Add type safety for chartData
+  const chartData = message.chartData as Record<string, any> | undefined;
 
   return (
     <div className={`mb-4 animate-slide-up ${isUser ? "flex justify-end" : ""}`}>
@@ -22,7 +23,9 @@ export default function Message({ message, onChartExpand }: MessageProps) {
       ) : (
         <div className="flex items-start space-x-3">
           <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-            🤖
+            <span role="img" aria-label="AI">
+              🤖
+            </span>
           </div>
           <div className="bg-gray-100 rounded-2xl rounded-tl-md p-4 max-w-2xl">
             <p className="text-gray-800 mb-4">{message.content}</p>

@@ -92,7 +92,9 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
                normalizedChart.data.labels && 
                normalizedChart.data.datasets && 
                Array.isArray(normalizedChart.data.labels) && 
-               normalizedChart.data.labels.length > 0;
+               Array.isArray(normalizedChart.data.datasets) &&
+               normalizedChart.data.labels.length > 0 &&
+               normalizedChart.data.datasets.length > 0;
         console.log(`📊 ${normalizedChart.type} chart ${key} validation:`, isValid);
         
         // Special debugging for line chart
@@ -102,7 +104,10 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
             hasLabels: !!normalizedChart.data?.labels,
             hasDatasets: !!normalizedChart.data?.datasets,
             labelsIsArray: Array.isArray(normalizedChart.data?.labels),
+            datasetsIsArray: Array.isArray(normalizedChart.data?.datasets),
             labelsLength: normalizedChart.data?.labels?.length || 0,
+            datasetsLength: normalizedChart.data?.datasets?.length || 0,
+            datasets: normalizedChart.data?.datasets,
             isValid
           });
         }
@@ -124,15 +129,37 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
   console.log('📊 All chart keys in data:', Object.keys(chartsData));
   
   // Check for missing line chart and create fallback if needed
-  const hasLineChart = availableCharts.some(chart => 
-    chart.chart.type === 'line' || 
-    chart.chart.title?.includes('Hourly Sentiment') ||
-    chart.key === '2' ||
-    chart.key === 'chart_2'
-  );
+  const hasLineChart = availableCharts.some(chart => {
+    const isLineChart = chart.chart.type === 'line' || 
+                       chart.chart.chart_type === 'line' ||
+                       chart.chart.title?.includes('Hourly Sentiment') ||
+                       chart.key === '2' ||
+                       chart.key === 'chart_2';
+    
+    // Enhanced validation for line charts
+    const hasValidData = chart.chart.data &&
+                        chart.chart.data.labels &&
+                        chart.chart.data.datasets &&
+                        Array.isArray(chart.chart.data.labels) &&
+                        Array.isArray(chart.chart.data.datasets) &&
+                        chart.chart.data.labels.length > 0 &&
+                        chart.chart.data.datasets.length > 0;
+    
+    if (isLineChart) {
+      console.log(`🔍 Line chart detection for ${chart.key}:`, {
+        isLineChart,
+        hasValidData,
+        chartType: chart.chart.type,
+        title: chart.chart.title,
+        dataStructure: chart.chart.data ? 'exists' : 'missing'
+      });
+    }
+    
+    return isLineChart && hasValidData;
+  });
   
   if (!hasLineChart) {
-    console.warn('⚠️ Line chart missing, creating fallback');
+    console.warn('⚠️ Line chart missing or invalid, creating fallback');
     const fallbackLineChart = {
       key: 'fallback_line',
       chart: {

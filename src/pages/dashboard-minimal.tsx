@@ -21,12 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { testFrontendBackendIntegration } from "@/utils/integrationTest";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { CacheManager } from "@/utils/cacheUtils";
+import { fetchEnhancedReportDataCached, EnhancedReportData } from "@/utils/enhancedReportData";
 
 export default function DashboardMinimal() {
   const { state } = useAppContext();
   const { isAdminEnabled } = useAppConfig();
   const reportRef = useRef<HTMLDivElement>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [enhancedReportData, setEnhancedReportData] = useState<EnhancedReportData | null>(null);
+  const [isLoadingEnhancedData, setIsLoadingEnhancedData] = useState(false);
   
   const [drillDownModal, setDrillDownModal] = useState<{
     isOpen: boolean;
@@ -177,6 +180,7 @@ export default function DashboardMinimal() {
         // These charts use the complex format: {labels: [], datasets: []}
         if (chart.data && chart.data.labels && chart.data.datasets) {
           // Data is already in the correct format
+          console.log('🔧 Line/radar chart data already in correct format');
           normalizedChart.data = chart.data;
         } else if (Array.isArray(chart.data)) {
           // Convert array format to line/radar format
@@ -195,6 +199,13 @@ export default function DashboardMinimal() {
               }),
               color: chart.data[0]?.color || '#3b82f6'
             }]
+          };
+        } else {
+          // If no valid data structure, create empty structure
+          console.warn('🔧 Line/radar chart has invalid data structure, creating empty dataset');
+          normalizedChart.data = {
+            labels: [],
+            datasets: []
           };
         }
       } else {
@@ -482,6 +493,22 @@ export default function DashboardMinimal() {
     
     try {
       setIsGeneratingReport(true);
+      setIsLoadingEnhancedData(true);
+      
+      // Fetch enhanced report data from OpenAI assistant
+      console.log('Fetching enhanced report data...');
+      const enhancedData = await fetchEnhancedReportDataCached({
+        topic: selectedTopic,
+        dateRange: {
+          from: selectedDateRange.from.toISOString(),
+          to: selectedDateRange.to.toISOString()
+        }
+      });
+      setEnhancedReportData(enhancedData);
+      setIsLoadingEnhancedData(false);
+      
+      // Give React a moment to update the ReportGenerator component with new data
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Use the same approach as PDF Export but open in new window for printing
       if (reportRef.current) {
@@ -562,6 +589,7 @@ export default function DashboardMinimal() {
       alert(`Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGeneratingReport(false);
+      setIsLoadingEnhancedData(false);
     }
   };
 
@@ -790,11 +818,11 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                         generateReport();
                         setIsSettingsOpen(false);
                       }}
-                      disabled={isDashboardLoading || isGeneratingReport}
+                      disabled={isDashboardLoading || isGeneratingReport || isLoadingEnhancedData}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
                     >
                       <FileText className="w-4 h-4" />
-                      {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                      {isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}
                     </button>
                     <button
                       onClick={() => {
@@ -907,6 +935,7 @@ Return analysis with specific transcript excerpts, quantified insights, and data
               selectedTopic,
               topicLabel: topicsData.find(t => t.value === selectedTopic)?.label || 'General'
             }}
+            enhancedData={enhancedReportData}
             normalizeChartData={normalizeChartData}
           />
         </div>

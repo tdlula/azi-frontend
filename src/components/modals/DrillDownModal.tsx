@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, BarChart, TrendingUp, Clock, Tag, Lightbulb, Radio, X, Database, AlertCircle, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DynamicAnalysisDisplay from "@/components/DynamicAnalysisDisplay";
 import ExportDropdown from "@/components/ui/export-dropdown";
 
 interface DrillDownModalProps {
@@ -73,13 +74,75 @@ export default function DrillDownModal({
     const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
     const dataValue = data?.value || data?.metricValue || 'N/A';
     
-    const textContent = `${type === 'chart' ? 'Chart' : 'Metric'}: ${title}
+    let textContent = `${type === 'chart' ? 'Chart' : 'Metric'}: ${title}
 Type: ${type === 'chart' ? data?.chartType || 'N/A' : 'metrics'}
 Data Point: ${dataLabel}
 Value: ${dataValue}
 Generated: ${new Date().toLocaleString()}
 
-Analysis Summary:
+`;
+
+    // Enhanced structured content based on analysisReport
+    if (analysis.analysisReport) {
+      textContent += `PROFESSIONAL ANALYSIS REPORT
+${'='.repeat(50)}
+
+`;
+
+      if (analysis.analysisReport.overview) {
+        textContent += `OVERVIEW
+${'-'.repeat(20)}
+${analysis.analysisReport.overview.content}
+${analysis.analysisReport.overview.highlight !== undefined ? `\nKey Metric: ${analysis.analysisReport.overview.highlight}` : ''}
+
+`;
+      }
+
+      if (analysis.analysisReport.insights?.items?.length > 0) {
+        textContent += `KEY INSIGHTS
+${'-'.repeat(20)}
+${analysis.analysisReport.insights.items.map((insight: any, index: number) => 
+  `${index + 1}. [${insight.importance?.toUpperCase() || 'STANDARD'}] ${insight.text}`
+).join('\n')}
+
+`;
+      }
+
+      if (analysis.analysisReport.breakdown?.sections?.length > 0) {
+        textContent += `DETAILED BREAKDOWN
+${'-'.repeat(20)}
+${analysis.analysisReport.breakdown.sections.map((section: any) => 
+  `${section.name}:\n${section.items?.map((item: string) => `  • ${item}`).join('\n') || '  No items'}`
+).join('\n\n')}
+
+`;
+      }
+
+      if (analysis.analysisReport.recommendations?.items?.length > 0) {
+        textContent += `STRATEGIC RECOMMENDATIONS
+${'-'.repeat(20)}
+${analysis.analysisReport.recommendations.items.map((rec: any, index: number) => 
+  `${index + 1}. [${rec.priority?.toUpperCase() || 'STANDARD'} PRIORITY] ${rec.text}${rec.category ? ` (Category: ${rec.category})` : ''}`
+).join('\n')}
+
+`;
+      }
+
+      if (analysis.analysisReport.evidence?.extracts?.length > 0) {
+        textContent += `SUPPORTING EVIDENCE
+${'-'.repeat(20)}
+${analysis.analysisReport.evidence.extracts.map((extract: any, index: number) => 
+  `${index + 1}. "${extract.quote}"
+   Source: ${extract.source} | Show: ${extract.show}
+   Presenter: ${extract.presenter} | Time: ${extract.timestamp}
+   ${extract.context ? `Context: ${extract.context}` : ''}`
+).join('\n\n')}
+
+`;
+      }
+    } else {
+      // Fallback to original format
+      textContent += `Analysis Summary:
 ${analysis.summary || 'No summary available'}
 
 Key Insights:
@@ -96,6 +159,18 @@ ${analysis.breakdown.components.map((comp: any, index: number) =>
 ${analysis.radioExtracts?.map((extract: any, index: number) => 
   `${index + 1}. ${extract.quote || extract.text || 'N/A'}${extract.station ? ` - ${extract.station}` : ''}${extract.timestamp ? ` (${extract.timestamp})` : ''}`
 ).join('\n') || 'No extracts available'}`;
+    }
+
+    if (analysis.metadata) {
+      textContent += `
+
+ANALYSIS METADATA
+${'-'.repeat(20)}
+Format: ${analysis.metadata.displayFormat}
+Total Sections: ${analysis.metadata.totalSections}
+Generated At: ${new Date(analysis.metadata.generatedAt).toLocaleString()}
+Data Points: ${Object.values(analysis.metadata.itemCounts || {}).reduce((a: any, b: any) => a + b, 0)}`;
+    }
 
     const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -309,327 +384,319 @@ ${analysis.radioExtracts?.map((extract: any, index: number) =>
               {/* Analysis Results */}
               {analysis && hasAnalyzed && (
                 <div className="space-y-6">
-                  {data?.metricType === "overall_positive_sentiment" ? (
-                    // Shoprite Sentiment Analysis Report Format
+                  {/* Executive Summary */}
+                  {analysis.summary && (
+                    <Card className="bg-[#2d3748] border-gray-600">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-[#e0e6ed] text-lg flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-[#60a5fa]" />
+                          Executive Summary
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-[#cbd5e0] leading-relaxed">{analysis.summary}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Professional Analysis Report */}
+                  {analysis.analysisReport && (
                     <div className="space-y-6">
-                      <Card className="bg-[#2d3748] border border-green-600 shadow-lg">
-                        <CardHeader>
-                          <CardTitle className="text-xl font-semibold text-[#e0e6ed]">
-                            🛒 Shoprite Radio Sentiment Analysis Report
-                          </CardTitle>
-                          <CardDescription className="text-base text-[#a0aec0] font-medium">
-                            <div>Period Covered: {analysis.periodCovered || 'Date range not specified'}</div>
-                            <div>Sentiment Score: 🟢 {data?.metricValue || analysis.sentimentScore || 'N/A'}% Positive</div>
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
+                      {/* Overview Section */}
+                      {analysis.analysisReport.overview && (
+                        <Card className="bg-[#2d3748] border-gray-600">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-[#e0e6ed] text-lg">
+                              {analysis.analysisReport.overview.title || "📊 Analysis Overview"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <p className="text-[#cbd5e0] leading-relaxed">
+                              {analysis.analysisReport.overview.content}
+                            </p>
+                            {analysis.analysisReport.overview.highlight !== undefined && (
+                              <div className="bg-[#1f2a38] p-4 rounded-lg border border-gray-600">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[#a0aec0] text-sm font-medium">Key Metric Value</span>
+                                  <span className="text-2xl font-bold text-[#60a5fa]">
+                                    {analysis.analysisReport.overview.highlight}
+                                    {analysis.analysisReport.overview.metricType?.includes('sentiment') ? '%' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
 
-                      <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                        <CardHeader>
-                          <CardTitle className="text-[#cbd5e0] font-semibold">📋 Raw Analysis Data</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm bg-[#1f2a38] text-[#e0e6ed] p-4 rounded-lg border border-gray-600 overflow-auto custom-scrollbar max-h-[400px] font-mono">
-                            {typeof analysis === 'string' ? analysis : JSON.stringify(analysis, null, 2)}
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  ) : type === 'chart' && analysis?.summary ? (
-                    // Professional Chart Analysis Format
-                    <div className="space-y-6">
-                      {(() => {
-                        // Parse the JSON from the summary if it's in JSON format
-                        let parsedSummary = null;
-                        console.log('🔍 Analysis summary type:', typeof analysis.summary);
-                        console.log('🔍 Analysis summary content:', analysis.summary);
-                        
-                        try {
-                          // Try multiple parsing approaches
-                          if (typeof analysis.summary === 'string') {
-                            // Method 1: Check for JSON wrapped in markdown
-                            if (analysis.summary.includes('```json') && analysis.summary.includes('```')) {
-                              console.log('🔍 Found JSON in markdown format');
-                              const jsonMatch = analysis.summary.match(/```json\n([\s\S]*?)\n```/);
-                              if (jsonMatch) {
-                                console.log('🔍 Extracted JSON:', jsonMatch[1]);
-                                parsedSummary = JSON.parse(jsonMatch[1]);
-                                console.log('✅ Successfully parsed JSON from markdown');
-                              }
-                            }
-                            // Method 2: Try direct JSON parsing
-                            else if (analysis.summary.trim().startsWith('{')) {
-                              console.log('🔍 Attempting direct JSON parse');
-                              parsedSummary = JSON.parse(analysis.summary);
-                              console.log('✅ Successfully parsed direct JSON');
-                            }
-                          }
-                          // Method 3: Check if summary is already an object
-                          else if (typeof analysis.summary === 'object' && analysis.summary !== null) {
-                            console.log('🔍 Summary is already an object');
-                            parsedSummary = analysis.summary;
-                          }
-                        } catch (e) {
-                          console.error('❌ JSON parsing failed:', e);
-                          console.log('🔍 Raw summary for debugging:', analysis.summary);
-                        }
+                      {/* Key Insights Section */}
+                      {analysis.analysisReport.insights && analysis.analysisReport.insights.items?.length > 0 && (
+                        <Card className="bg-[#2d3748] border-gray-600">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-[#e0e6ed] text-lg">
+                              {analysis.analysisReport.insights.title || "🎯 Key Insights"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {analysis.analysisReport.insights.items.map((insight: any, index: number) => (
+                                <div key={index} className="flex items-start gap-3 p-3 bg-[#1f2a38] rounded-lg border border-gray-600">
+                                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                                    insight.importance === 'high' ? 'bg-red-400' :
+                                    insight.importance === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                                  }`} />
+                                  <div className="flex-1">
+                                    <p className="text-[#cbd5e0] text-sm leading-relaxed">{insight.text}</p>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`mt-2 text-xs ${
+                                        insight.importance === 'high' ? 'border-red-400 text-red-400' :
+                                        insight.importance === 'medium' ? 'border-yellow-400 text-yellow-400' : 'border-green-400 text-green-400'
+                                      }`}
+                                    >
+                                      {insight.importance?.toUpperCase()} PRIORITY
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                        console.log('🔍 Final parsed summary:', parsedSummary);
-                        console.log('🔍 Has topicName:', !!parsedSummary?.topicName);
-                        console.log('🔍 Has contributingFactors:', !!parsedSummary?.contributingFactors);
-
-                        if (parsedSummary && (parsedSummary.topicName || parsedSummary.executiveSummary || parsedSummary.contributingFactors)) {
-                          console.log('✅ Using professional format');
-                          return (
-                            <>
-                              {/* Executive Summary */}
-                              <Card className="bg-[#2d3748] border border-blue-600 shadow-lg">
-                                <CardHeader>
-                                  <CardTitle className="text-xl font-semibold text-[#e0e6ed] flex items-center gap-2">
-                                    <Radio className="w-6 h-6 text-[#60a5fa]" />
-                                    {parsedSummary.topicName || 'Chart Analysis Results'}
-                                  </CardTitle>
-                                  <CardDescription className="text-base text-[#a0aec0] font-medium">
-                                    {parsedSummary.executiveSummary || 'Comprehensive analysis of radio broadcast data'}
-                                  </CardDescription>
-                                </CardHeader>
-                              </Card>
-
-                              {/* Key Findings */}
-                              {parsedSummary.keyFinding && (
-                                <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                  <CardHeader>
-                                    <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                      <Lightbulb className="w-5 h-5 text-[#fbbf24]" />
-                                      Key Finding
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <p className="text-[#e0e6ed] leading-relaxed">{parsedSummary.keyFinding}</p>
-                                  </CardContent>
-                                </Card>
-                              )}
-
-                              {/* Contributing Factors */}
-                              {parsedSummary.contributingFactors && parsedSummary.contributingFactors.length > 0 && (
-                                <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                  <CardHeader>
-                                    <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                      <TrendingUp className="w-5 h-5 text-[#10b981]" />
-                                      Contributing Factors
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-4">
-                                    {parsedSummary.contributingFactors.map((factor: any, index: number) => (
-                                      <div key={index} className="border-l-4 border-[#60a5fa] pl-4">
-                                        <h4 className="font-semibold text-[#e0e6ed] mb-2">{factor.name}</h4>
-                                        <p className="text-[#a0aec0] mb-3">{factor.description}</p>
-                                        {factor.examples && factor.examples.length > 0 && (
-                                          <div className="space-y-2">
-                                            <p className="text-sm font-medium text-[#cbd5e0]">Examples:</p>
-                                            {factor.examples.map((example: string, exIndex: number) => (
-                                              <blockquote key={exIndex} className="bg-[#1f2a38] text-[#e0e6ed] p-3 rounded border-l-2 border-[#60a5fa] text-sm italic">
-                                                "{example}"
-                                              </blockquote>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
+                      {/* Detailed Breakdown Section */}
+                      {analysis.analysisReport.breakdown && analysis.analysisReport.breakdown.sections?.length > 0 && (
+                        <Card className="bg-[#2d3748] border-gray-600">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-[#e0e6ed] text-lg">
+                              {analysis.analysisReport.breakdown.title || "🔍 Detailed Breakdown"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {analysis.analysisReport.breakdown.sections.map((section: any, index: number) => (
+                                <div key={index} className="bg-[#1f2a38] p-4 rounded-lg border border-gray-600">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-lg">{section.icon}</span>
+                                    <h4 className="font-semibold text-[#e0e6ed] text-sm">{section.name}</h4>
+                                  </div>
+                                  <ul className="space-y-2">
+                                    {section.items?.map((item: string, itemIndex: number) => (
+                                      <li key={itemIndex} className="text-[#a0aec0] text-xs flex items-start gap-2">
+                                        <span className="w-1 h-1 bg-[#60a5fa] rounded-full mt-2 flex-shrink-0" />
+                                        <span>{item}</span>
+                                      </li>
                                     ))}
-                                  </CardContent>
-                                </Card>
-                              )}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                              {/* Station Quotes */}
-                              {parsedSummary.stationQuotes && parsedSummary.stationQuotes.length > 0 && (
-                                <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                  <CardHeader>
-                                    <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                      <Radio className="w-5 h-5 text-[#8b5cf6]" />
-                                      Radio Station Quotes
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-4">
-                                    {parsedSummary.stationQuotes.map((station: any, index: number) => (
-                                      <div key={index} className="space-y-3">
-                                        <h4 className="font-semibold text-[#e0e6ed] flex items-center gap-2">
-                                          <span className="w-2 h-2 bg-[#60a5fa] rounded-full"></span>
-                                          {station.stationName}
-                                        </h4>
-                                        {station.quotes && station.quotes.map((quote: string, qIndex: number) => (
-                                          <blockquote key={qIndex} className="bg-[#1f2a38] text-[#e0e6ed] p-3 rounded border-l-2 border-[#8b5cf6] text-sm">
-                                            "{quote}"
-                                          </blockquote>
-                                        ))}
-                                      </div>
-                                    ))}
-                                  </CardContent>
-                                </Card>
-                              )}
+                      {/* Strategic Recommendations */}
+                      {analysis.analysisReport.recommendations && analysis.analysisReport.recommendations.items?.length > 0 && (
+                        <Card className="bg-[#2d3748] border-gray-600">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-[#e0e6ed] text-lg">
+                              {analysis.analysisReport.recommendations.title || "💡 Strategic Recommendations"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {analysis.analysisReport.recommendations.items.map((rec: any, index: number) => (
+                                <div key={index} className="flex items-start gap-3 p-4 bg-[#1f2a38] rounded-lg border border-gray-600">
+                                  <div className="flex items-center justify-center w-6 h-6 bg-[#60a5fa] text-white rounded-full text-xs font-bold flex-shrink-0 mt-0.5">
+                                    {index + 1}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-[#cbd5e0] text-sm leading-relaxed mb-2">{rec.text}</p>
+                                    <div className="flex items-center gap-2">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${
+                                          rec.priority === 'high' ? 'border-red-400 text-red-400' :
+                                          rec.priority === 'medium' ? 'border-yellow-400 text-yellow-400' : 'border-green-400 text-green-400'
+                                        }`}
+                                      >
+                                        {rec.priority?.toUpperCase()} PRIORITY
+                                      </Badge>
+                                      {rec.category && (
+                                        <Badge variant="outline" className="text-xs border-[#60a5fa] text-[#60a5fa]">
+                                          {rec.category}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                              {/* Key Insights & Patterns */}
-                              {parsedSummary.keyInsightsAndPatterns && parsedSummary.keyInsightsAndPatterns.length > 0 && (
-                                <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                  <CardHeader>
-                                    <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                      <BarChart className="w-5 h-5 text-[#f59e0b]" />
-                                      Key Insights & Patterns
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-4">
-                                    {parsedSummary.keyInsightsAndPatterns.map((insight: any, index: number) => (
-                                      <div key={index} className="border-l-4 border-[#f59e0b] pl-4">
-                                        <h4 className="font-semibold text-[#e0e6ed] mb-2">{insight.category}</h4>
-                                        <p className="text-[#a0aec0] mb-3">{insight.description}</p>
-                                        {insight.bullets && insight.bullets.length > 0 && (
-                                          <ul className="space-y-1">
-                                            {insight.bullets.map((bullet: string, bIndex: number) => (
-                                              <li key={bIndex} className="text-[#e0e6ed] text-sm flex items-start gap-2">
-                                                <span className="w-1.5 h-1.5 bg-[#f59e0b] rounded-full mt-2 flex-shrink-0"></span>
-                                                <span>{bullet}</span>
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </CardContent>
-                                </Card>
-                              )}
-
-                              {/* Business Impact */}
-                              {parsedSummary.businessImpact && parsedSummary.businessImpact.length > 0 && (
-                                <Card className="bg-[#2d3748] border border-green-600 shadow-lg">
-                                  <CardHeader>
-                                    <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                      <TrendingUp className="w-5 h-5 text-[#10b981]" />
-                                      Business Impact
-                                    </CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-4">
-                                    {parsedSummary.businessImpact.map((impact: any, index: number) => (
-                                      <div key={index} className="border-l-4 border-[#10b981] pl-4">
-                                        <h4 className="font-semibold text-[#e0e6ed] mb-2">{impact.category}</h4>
-                                        {impact.benefits && impact.benefits.length > 0 && (
-                                          <ul className="space-y-2">
-                                            {impact.benefits.map((benefit: string, bIndex: number) => (
-                                              <li key={bIndex} className="text-[#e0e6ed] text-sm flex items-start gap-2">
-                                                <span className="w-1.5 h-1.5 bg-[#10b981] rounded-full mt-2 flex-shrink-0"></span>
-                                                <span>{benefit}</span>
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </CardContent>
-                                </Card>
-                              )}
-
-                              {/* Analysis Metadata */}
-                              <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                <CardHeader>
-                                  <CardTitle className="text-[#cbd5e0] font-semibold flex items-center gap-2">
-                                    <Database className="w-5 h-5 text-[#6b7280]" />
-                                    Analysis Details
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    {parsedSummary.analysisPeriod && (
-                                      <div>
-                                        <span className="font-medium text-[#cbd5e0]">Period:</span>
-                                        <span className="text-[#e0e6ed] ml-2">{parsedSummary.analysisPeriod}</span>
-                                      </div>
-                                    )}
-                                    {parsedSummary.frequency && (
-                                      <div>
-                                        <span className="font-medium text-[#cbd5e0]">Frequency:</span>
-                                        <span className="text-[#e0e6ed] ml-2">{parsedSummary.frequency}</span>
-                                      </div>
-                                    )}
-                                    {parsedSummary.stationsAnalyzed && parsedSummary.stationsAnalyzed.length > 0 && (
-                                      <div className="md:col-span-2">
-                                        <span className="font-medium text-[#cbd5e0]">Stations Analyzed:</span>
-                                        <div className="flex flex-wrap gap-2 mt-1">
-                                          {parsedSummary.stationsAnalyzed.map((station: string, index: number) => (
-                                            <Badge key={index} className="bg-[#374151] text-[#e0e6ed] text-xs">
-                                              {station}
-                                            </Badge>
-                                          ))}
+                      {/* Supporting Evidence */}
+                      {analysis.analysisReport.evidence && analysis.analysisReport.evidence.extracts?.length > 0 && (
+                        <Card className="bg-[#2d3748] border-gray-600">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-[#e0e6ed] text-lg">
+                              {analysis.analysisReport.evidence.title || "📝 Supporting Evidence"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              {analysis.analysisReport.evidence.extracts.map((extract: any, index: number) => (
+                                <div key={index} className="bg-[#1f2a38] p-4 rounded-lg border border-gray-600">
+                                  <div className="flex items-start gap-3">
+                                    <Radio className="w-4 h-4 text-[#60a5fa] mt-1 flex-shrink-0" />
+                                    <div className="flex-1">
+                                      <blockquote className="text-[#cbd5e0] text-sm italic leading-relaxed mb-3 border-l-2 border-[#60a5fa] pl-3">
+                                        "{extract.quote}"
+                                      </blockquote>
+                                      <div className="grid grid-cols-2 gap-4 text-xs text-[#a0aec0]">
+                                        <div>
+                                          <span className="font-medium">Source:</span> {extract.source}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">Show:</span> {extract.show}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">Presenter:</span> {extract.presenter}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">Timestamp:</span> {extract.timestamp}
                                         </div>
                                       </div>
-                                    )}
-                                    {parsedSummary.methodology && (
-                                      <div className="md:col-span-2">
-                                        <span className="font-medium text-[#cbd5e0]">Methodology:</span>
-                                        <p className="text-[#e0e6ed] mt-1">{parsedSummary.methodology}</p>
+                                      {extract.context && (
+                                        <div className="mt-2 text-xs text-[#a0aec0]">
+                                          <span className="font-medium">Context:</span> {extract.context}
+                                        </div>
+                                      )}
+                                      {extract.heatmapData && (
+                                        <div className="mt-3 p-3 bg-[#2d3748] rounded border border-gray-600">
+                                          <h5 className="text-xs font-medium text-[#e0e6ed] mb-2">Heatmap Data</h5>
+                                          <div className="grid grid-cols-2 gap-2 text-xs text-[#a0aec0]">
+                                            <div><span className="font-medium">Intensity:</span> {extract.heatmapData.intensity}</div>
+                                            <div><span className="font-medium">Coordinates:</span> {extract.heatmapData.coordinates}</div>
+                                            <div><span className="font-medium">X Category:</span> {extract.heatmapData.xCategory}</div>
+                                            <div><span className="font-medium">Y Category:</span> {extract.heatmapData.yCategory}</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback to Dynamic Display for backward compatibility */}
+                  {!analysis.analysisReport && (
+                    <DynamicAnalysisDisplay 
+                      data={analysis} 
+                      title={title || "Analysis Results"} 
+                      description="Automatically formatted analysis from backend data." 
+                    />
+                  )}
+
+                  {/* Data Evidence Sources - Always show for debugging */}
+                  {analysis && hasAnalyzed && (
+                    <Card className="bg-[#2d3748] border-gray-600">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-[#e0e6ed] text-lg flex items-center gap-2">
+                          <Database className="w-5 h-5 text-[#60a5fa]" />
+                          Data Evidence Sources
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {(() => {
+                            // Debug: log the analysis structure
+                            console.log('Analysis object for Data Evidence:', analysis);
+                            console.log('Analysis Report Evidence:', analysis.analysisReport?.evidence);
+                            console.log('Radio Extracts:', analysis.radioExtracts);
+
+                            // Extract unique radio stations and dates from evidence
+                            const extracts = analysis.analysisReport?.evidence?.extracts || analysis.radioExtracts || [];
+                            console.log('Extracted data for stations:', extracts);
+                            
+                            const stations = new Map();
+                            
+                            extracts.forEach((extract: any) => {
+                              const station = extract.source || extract.station || 'Unknown Station';
+                              const timestamp = extract.timestamp || extract.date;
+                              
+                              console.log('Processing extract:', { station, timestamp, extract });
+                              
+                              if (!stations.has(station)) {
+                                stations.set(station, new Set());
+                              }
+                              
+                              if (timestamp) {
+                                // Extract date from timestamp
+                                let date = timestamp;
+                                if (typeof timestamp === 'string') {
+                                  // Handle different timestamp formats
+                                  if (timestamp.includes('T')) {
+                                    date = timestamp.split('T')[0]; // ISO format
+                                  } else if (timestamp.includes(' ')) {
+                                    date = timestamp.split(' ')[0]; // Space separated
+                                  } else if (timestamp.includes('-') && timestamp.length >= 10) {
+                                    date = timestamp.substring(0, 10); // Take first 10 chars for YYYY-MM-DD
+                                  }
+                                }
+                                
+                                console.log('Processed date:', date);
+                                
+                                if (date && date.match(/\d{4}-\d{2}-\d{2}/)) {
+                                  stations.get(station).add(date);
+                                }
+                              }
+                            });
+
+                            console.log('Final stations map:', stations);
+
+                            // If no stations found, show placeholder
+                            if (stations.size === 0) {
+                              return (
+                                <div className="text-center py-4">
+                                  <div className="text-[#a0aec0] text-sm">
+                                    No radio station data available for this analysis
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return Array.from(stations.entries()).map(([station, dates], index) => {
+                              const dateArray = Array.from(dates as Set<string>);
+                              return (
+                                <div key={index} className="flex items-center gap-3 p-3 bg-[#1f2a38] rounded-lg border border-gray-600">
+                                  <Radio className="w-4 h-4 text-[#60a5fa] flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <div className="text-[#cbd5e0] text-sm font-medium">
+                                      {station} (radio station)
+                                    </div>
+                                    {dateArray.length > 0 && (
+                                      <div className="text-[#a0aec0] text-xs mt-1">
+                                        Transcripts dated: {dateArray.sort().join(', ')}
                                       </div>
                                     )}
                                   </div>
-                                </CardContent>
-                              </Card>
-                            </>
-                          );
-                        } else {
-                          // Fallback to original display if parsing fails
-                          console.log('❌ Using fallback format - parsing failed or no valid data structure');
-                          console.log('🔍 Fallback analysis object:', analysis);
-                          return (
-                            <div className="space-y-6">
-                              {/* Debug information */}
-                              <Card className="bg-[#2d3748] border border-yellow-600 shadow-lg">
-                                <CardHeader>
-                                  <CardTitle className="flex items-center gap-2 text-[#cbd5e0] font-semibold">
-                                    <AlertCircle className="w-5 h-5 text-[#fbbf24]" />
-                                    Debug Information
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-sm space-y-2 text-[#e0e6ed]">
-                                    <p><strong>Summary Type:</strong> {typeof analysis.summary}</p>
-                                    <p><strong>Has Summary:</strong> {analysis.summary ? 'Yes' : 'No'}</p>
-                                    <p><strong>Summary Length:</strong> {analysis.summary?.length || 0}</p>
-                                    <p><strong>Contains JSON markers:</strong> {analysis.summary?.includes('```json') ? 'Yes' : 'No'}</p>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              
-                              <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                                <CardHeader>
-                                  <CardTitle className="flex items-center gap-2 text-[#cbd5e0] font-semibold">
-                                    <Lightbulb className="w-5 h-5 text-[#60a5fa]" />
-                                    Radio Content Analysis Results
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <pre className="whitespace-pre-wrap text-sm bg-[#1f2a38] text-[#e0e6ed] p-4 rounded-lg border border-gray-600 overflow-auto custom-scrollbar max-h-[400px] font-mono">
-                                    {typeof analysis === 'string' ? analysis : JSON.stringify(analysis, null, 2)}
-                                  </pre>
-                                </CardContent>
-                              </Card>
-                            </div>
-                          );
-                        }
-                      })()}
-                    </div>
-                  ) : (
-                    // Default analysis format for other metrics
-                    <div className="space-y-6">
-                      <Card className="bg-[#2d3748] border border-gray-600 shadow-lg">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-[#cbd5e0] font-semibold">
-                            <Lightbulb className="w-5 h-5 text-[#60a5fa]" />
-                            Radio Content Analysis Results
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm bg-[#1f2a38] text-[#e0e6ed] p-4 rounded-lg border border-gray-600 overflow-auto custom-scrollbar max-h-[400px] font-mono">
-                            {typeof analysis === 'string' ? analysis : JSON.stringify(analysis, null, 2)}
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    </div>
+                                  <Badge variant="outline" className="text-xs border-[#60a5fa] text-[#60a5fa]">
+                                    {extracts.filter((e: any) => (e.source || e.station) === station).length} extracts
+                                  </Badge>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               )}

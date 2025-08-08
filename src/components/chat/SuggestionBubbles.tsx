@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, BarChart3, PieChart, LineChart, Brain, Target } from "lucide-react";
-import type { Suggestion } from "@shared/schema";
+
+// Define Suggestion type locally to match usage
+interface Suggestion {
+  id: string;
+  text: string;
+  category: "analysis" | "visualization" | "prediction" | "comparison";
+  emoji: string;
+  prompt: string;
+}
 
 interface SuggestionBubblesProps {
   onSuggestionClick: (prompt: string) => void;
@@ -52,14 +60,14 @@ const defaultSuggestions: Suggestion[] = [
   }
 ];
 
-const categoryColors = {
+const categoryColors: Record<Suggestion["category"], string> = {
   analysis: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
   visualization: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100", 
   prediction: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100",
   comparison: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
 };
 
-const categoryIcons = {
+const categoryIcons: Record<Suggestion["category"], React.ComponentType<{ size?: string | number }>> = {
   analysis: TrendingUp,
   visualization: BarChart3,
   prediction: Brain,
@@ -77,7 +85,6 @@ export default function SuggestionBubbles({ onSuggestionClick }: SuggestionBubbl
             <p className="text-sm font-medium text-gray-700">AI Suggestions</p>
             <Badge variant="secondary" className="text-xs">Smart Prompts</Badge>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {defaultSuggestions.map((suggestion) => {
               const IconComponent = categoryIcons[suggestion.category];
@@ -100,7 +107,6 @@ export default function SuggestionBubbles({ onSuggestionClick }: SuggestionBubbl
               );
             })}
           </div>
-
           <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
