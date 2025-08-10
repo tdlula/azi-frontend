@@ -64,6 +64,8 @@ interface AppState {
   
   // Cache state
   cachedResponses: Map<string, any>;
+    dashboardError?: string;
+    wordCloudError?: string;
 }
 
 // Action types
@@ -76,7 +78,8 @@ type AppAction =
   | { type: 'SET_SUGGESTIONS_LOADING'; payload: boolean }
   | { type: 'SET_DASHBOARD_DATA'; payload: DashboardData }
   | { type: 'SET_DASHBOARD_LOADING'; payload: boolean }
-  | { type: 'SET_WORD_CLOUD_DATA'; payload: any }
+    | { type: 'SET_DASHBOARD_ERROR'; payload: string }
+    | { type: 'SET_WORD_CLOUD_DATA'; payload: any }
   | { type: 'SET_WORD_CLOUD_LOADING'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'UPDATE_LAST_ACTIVITY' }
@@ -92,11 +95,13 @@ const initialState: AppState = {
   isSuggestionsLoading: false,
   dashboardData: null,
   isDashboardLoading: false,
-  wordCloudData: null,
+    dashboardError: undefined,
+    wordCloudData: null,
   isWordCloudLoading: false,
-  isLoading: false,
-  lastActivity: new Date(),
-  cachedResponses: new Map(),
+    wordCloudError: undefined,
+    isLoading: false,
+    lastActivity: new Date(),
+    cachedResponses: new Map(),
 };
 
 // Reducer

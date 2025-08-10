@@ -1,44 +1,47 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
-const isDev = process.env.NODE_ENV !== 'production' && process.env.npm_lifecycle_event !== 'build';
-const devBackend = 'http://localhost:5000';
-const prodBackend = 'http://129.151.191.161:7000';
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    port: 3000,
-    proxy: {
-      "/api": {
-        target: isDev ? devBackend : prodBackend,
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path, // Keep the /api prefix
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const isDev = env.ENVIRONMENT !== 'production';
+  const backendUrl = isDev ? `http://localhost:${env.BACKEND_PORT}` : `http://${env.BACKEND_SERVER}:${env.BACKEND_PORT}`;
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        // Add cache busting to built files
-        entryFileNames: `assets/[name].[hash].js`,
-        chunkFileNames: `assets/[name].[hash].js`,
-        assetFileNames: `assets/[name].[hash].[ext]`
-      }
-    }
-  },
-  // Environment variables for backend
-  define: {
-    __BACKEND_URL__: JSON.stringify(isDev ? devBackend : prodBackend),
-  },
-  // Clear cache on dev server restart
-  clearScreen: false,
-  cacheDir: 'node_modules/.vite'
+    server: {
+      port: Number(env.FRONTEND_PORT) || 7001,
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (p) => p,
+        },
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name].[hash].js',
+          chunkFileNames: 'assets/[name].[hash].js',
+          assetFileNames: 'assets/[name].[hash].[ext]',
+        },
+      },
+    },
+    define: {
+      'process.env': {
+        BACKEND_PORT: env.BACKEND_PORT,
+        BACKEND_SERVER: env.BACKEND_SERVER,
+        ENVIRONMENT: env.ENVIRONMENT,
+      },
+      __BACKEND_URL__: JSON.stringify(backendUrl),
+    },
+    clearScreen: false,
+    cacheDir: 'node_modules/.vite',
+  };
 });
