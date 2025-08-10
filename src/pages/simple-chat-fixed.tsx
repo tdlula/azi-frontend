@@ -178,7 +178,58 @@ export default function SimpleChatFixedPage() {
         });
 
         if (chartResponse.ok) {
-          const chartData = await chartResponse.json();
+          const rawChartData = await chartResponse.json();
+          
+          // Normalize chart data using the same logic as dashboard
+          const normalizeChartData = (chart: any) => {
+            if (!chart || (!chart.data && !chart.datasets)) {
+              console.warn('🔧 Chart normalization: No chart or data found', chart);
+              return chart;
+            }
+            
+            try {
+              const normalizedChart = { ...chart };
+              
+              // Determine chart type - handle both 'type' and 'chart_type' fields
+              const chartType = chart.type || chart.chart_type || 'bar';
+              normalizedChart.type = chartType;
+              normalizedChart.chart_type = chartType;
+              
+              // Ensure title exists
+              if (!normalizedChart.title) {
+                normalizedChart.title = 'Generated Chart';
+              }
+              
+              console.log('🔧 Chart normalized with type:', chartType);
+              return normalizedChart;
+              
+            } catch (error) {
+              console.error('🔧 Error normalizing chart data:', error);
+              // Return chart with default type as fallback
+              return {
+                ...chart,
+                type: 'bar',
+                chart_type: 'bar',
+                title: chart.title || 'Generated Chart'
+              };
+            }
+          };
+          
+          const chartData = normalizeChartData(rawChartData);
+          
+          // Enhanced debugging for chart data structure
+          console.log('[Chart Generation] Raw chart data from API:', rawChartData);
+          console.log('[Chart Generation] Normalized chart data:', chartData);
+          console.log('[Chart Generation] Chart data analysis:', {
+            hasType: !!(chartData.type || chartData.chart_type),
+            type: chartData.type || chartData.chart_type,
+            hasData: !!chartData.data,
+            dataType: Array.isArray(chartData.data) ? 'array' : typeof chartData.data,
+            dataLength: Array.isArray(chartData.data) ? chartData.data.length : Object.keys(chartData.data || {}).length,
+            hasTitle: !!chartData.title,
+            allKeys: Object.keys(chartData)
+          });
+          
           const aiMessage: Message = {
             id: generateUniqueId(),
             content: chartData.message || "Here's your requested chart:",
@@ -188,6 +239,9 @@ export default function SimpleChatFixedPage() {
           };
           dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
           return;
+        } else {
+          console.error('[Chart Generation] Chart API request failed:', chartResponse.status, chartResponse.statusText);
+          // Fall through to regular chat processing if chart generation fails
         }
       }
 
@@ -768,8 +822,27 @@ export default function SimpleChatFixedPage() {
                         )}
                         {message.chartData && (
                           <div className="mt-4 p-4 sm:p-6 bg-card border border-border rounded-lg">
-                            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{message.chartData.title}</h3>
-                            <ChartRenderer chartData={message.chartData} />
+                            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{message.chartData.title || 'Generated Chart'}</h3>
+                            {/* Add defensive rendering - only render if chart has valid structure */}
+                            {(message.chartData.type || message.chartData.chart_type) && message.chartData.data ? (
+                              <ChartRenderer chartData={message.chartData} />
+                            ) : (
+                              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                <div className="text-center">
+                                  <p>Chart data is incomplete</p>
+                                  <p className="text-sm mt-1">
+                                    Missing: {!message.chartData.type && !message.chartData.chart_type ? 'type field' : ''} 
+                                    {!message.chartData.data ? ((!message.chartData.type && !message.chartData.chart_type) ? ' and data field' : 'data field') : ''}
+                                  </p>
+                                  <details className="mt-2 text-xs">
+                                    <summary className="cursor-pointer">Debug Info</summary>
+                                    <pre className="mt-1 text-left bg-muted p-2 rounded overflow-auto max-h-32">
+                                      {JSON.stringify(message.chartData, null, 2)}
+                                    </pre>
+                                  </details>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         {message.sentimentData && (

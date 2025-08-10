@@ -10,6 +10,7 @@ pnpm-debug.log*
 # yarn.lock
 # pnpm-lock.yaml
 
+vite.config.ts
 vite.config.local.ts
 vite.config.local.js
 
@@ -61,11 +62,7 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*
 
 # parcel-bundler cache
 .cache
