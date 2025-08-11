@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: Number(env.FRONTEND_PORT) || 7001,
+      port: Number(env.FRONTEND_PORT) || 3000,
       proxy: {
         '/api': {
           target: backendUrl,

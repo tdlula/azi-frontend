@@ -1,0 +1,212 @@
+/* Chatbot Page - Tailwind CSS Classes */
+
+/* Main Container */
+.chatbot-page {
+  @apply min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800;
+}
+
+/* Header */
+.chatbot-header {
+  @apply bg-white/10 backdrop-blur-md border-b border-white/20;
+}
+
+.header-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.header-content {
+  @apply flex justify-between items-center h-16;
+}
+
+.header-brand {
+  @apply flex items-center space-x-3;
+}
+
+.brand-icon {
+  @apply p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg;
+}
+
+.brand-icon-svg {
+  @apply w-6 h-6 text-white;
+}
+
+.brand-title {
+  @apply text-xl font-bold text-white;
+}
+
+.brand-subtitle {
+  @apply text-sm text-gray-300;
+}
+
+.menu-btn {
+  @apply p-2 text-white hover:bg-white/10 rounded-lg transition-colors;
+}
+
+.menu-icon {
+  @apply w-6 h-6;
+}
+
+/* Main Content */
+.main-content {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6;
+}
+
+/* Chat Container */
+.chat-container {
+  @apply max-w-4xl mx-auto;
+}
+
+.chat-wrapper {
+  @apply bg-white/10 backdrop-blur-md rounded-xl border border-white/20 overflow-hidden;
+  height: calc(100vh - 200px);
+}
+
+/* Chat Header */
+.chat-header {
+  @apply bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4;
+}
+
+.chat-title {
+  @apply text-xl font-semibold text-white;
+}
+
+.chat-subtitle {
+  @apply text-blue-100 text-sm;
+}
+
+/* Messages Area */
+.messages-container {
+  @apply flex-1 overflow-y-auto p-6 space-y-6;
+  height: calc(100% - 140px);
+}
+
+.message-wrapper {
+  @apply flex items-start space-x-3 max-w-3xl;
+}
+
+.message-wrapper-user {
+  @apply flex items-start space-x-3 max-w-3xl justify-end flex-row-reverse space-x-reverse;
+}
+
+.message-avatar {
+  @apply flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center;
+}
+
+.message-avatar-user {
+  @apply flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600;
+}
+
+.message-avatar-bot {
+  @apply flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-r from-emerald-500 to-teal-600;
+}
+
+.avatar-icon {
+  @apply w-4 h-4 text-white;
+}
+
+.message-bubble {
+  @apply px-4 py-3 rounded-2xl;
+}
+
+.message-bubble-user {
+  @apply px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white;
+}
+
+.message-bubble-bot {
+  @apply px-4 py-3 rounded-2xl bg-white/20 text-white border border-white/30;
+}
+
+.message-text {
+  @apply text-sm leading-relaxed;
+}
+
+.message-timestamp {
+  @apply text-xs opacity-70 mt-2;
+}
+
+/* Input Area */
+.input-container {
+  @apply p-6 border-t border-white/20 bg-white/5;
+}
+
+.input-wrapper {
+  @apply flex items-center space-x-4;
+}
+
+.message-input {
+  @apply flex-1 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.send-button {
+  @apply p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl;
+}
+
+.send-icon {
+  @apply w-5 h-5;
+}
+
+/* Utility Classes for Animation */
+.message-slide-in {
+  @apply animate-in slide-in-from-bottom-2 duration-300;
+}
+
+/* Custom Scrollbar (using @layer utilities if needed) */
+@layer utilities {
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Responsive Variants */
+@media (max-width: 768px) {
+  .chat-wrapper-mobile {
+    height: calc(100vh - 160px);
+  }
+}
+
+/* Animation Classes */
+.fade-in {
+  @apply animate-in fade-in duration-300;
+}
+
+.slide-up {
+  @apply animate-in slide-in-from-bottom-4 duration-300;
+}
+
+/* Focus States */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-transparent;
+}
+
+/* Loading State */
+.loading-disabled {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+/* Hover Effects */
+.hover-lift {
+  @apply hover:transform hover:-translate-y-0.5 transition-transform duration-200;
+}
+
+.hover-glow {
+  @apply hover:shadow-lg hover:shadow-blue-500/25 transition-shadow duration-200;
+}

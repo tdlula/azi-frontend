@@ -213,9 +213,92 @@ Data Points: ${Object.values(analysis.metadata.itemCounts || {}).reduce((a: any,
     URL.revokeObjectURL(url);
   };
 
+  const exportAsPDF = async () => {
+    setIsExporting(true);
+    try {
+      const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
+      const dataValue = data?.value || data?.metricValue || 'N/A';
+      
+      const exportData = {
+        chartTitle: `${title} Analysis`,
+        chartType: type,
+        dataPoint: {
+          label: dataLabel,
+          value: dataValue
+        },
+        analysis: {
+          summary: analysis?.summary || '',
+          breakdown: analysis?.breakdown || {},
+          recommendations: analysis?.recommendations || [],
+          analysisReport: analysis?.analysisReport || null
+        },
+        timestamp: new Date().toISOString(),
+        reportTitle: `${title} Analysis Report`
+      };
+
+      const response = await fetch('/api/export-chart-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exportData),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      setError('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportAsPNG = async () => {
+    setIsExporting(true);
+    try {
+      const modal = document.querySelector('[data-testid="drill-down-modal"]');
+      if (!modal) {
+        console.error('Modal element not found');
+        setError('Unable to capture modal for image export');
+        return;
+      }
+
+      // Dynamic import to reduce bundle size
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(modal as HTMLElement, {
+        backgroundColor: '#1f2a38',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true
+      });
+
+      const dataLabel = data?.label || data?.category || data?.metricTitle || 'Unknown';
+      const link = document.createElement('a');
+      link.download = `${type === 'chart' ? 'Chart' : 'Metrics'}_Analysis_${dataLabel.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('PNG export failed:', error);
+      setError('Failed to export PNG. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-[#2d3748] rounded-xl shadow-2xl max-w-4xl w-full m-4 max-h-[90vh] overflow-hidden border border-gray-600" style={{ height: '90vh' }}>
+      <div 
+        className="bg-[#2d3748] rounded-xl shadow-2xl max-w-4xl w-full m-4 max-h-[90vh] overflow-hidden border border-gray-600" 
+        style={{ height: '90vh' }}
+        data-testid="drill-down-modal"
+      >
         <div className="flex flex-col h-full" style={{ maxHeight: '100%' }}>
           {/* Header */}
           <div className="p-6 border-b border-gray-600 flex justify-between items-start bg-[#2d3748]">
@@ -267,8 +350,11 @@ Data Points: ${Object.values(analysis.metadata.itemCounts || {}).reduce((a: any,
                   onExport={(format) => {
                     if (format === 'txt') exportAsTXT();
                     else if (format === 'json') exportAsJSON();
+                    else if (format === 'pdf') exportAsPDF();
+                    else if (format === 'png') exportAsPNG();
                   }}
                   disabled={isExporting}
+                  loading={isExporting}
                 />
               )}
               <Button
