@@ -3,6 +3,7 @@ import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ENV } from '@/lib/env';
 
 export function BackendConnectionStatus() {
   const { 
@@ -68,7 +69,7 @@ export function BackendConnectionStatus() {
         <div className="space-y-2">
           <div className="font-medium">Possible solutions:</div>
           <ul className="list-disc list-inside space-y-1 text-sm ml-4">
-            <li>Ensure the backend server is running on port 5000</li>
+            <li>Ensure the backend server is running on port {ENV.BACKEND_PORT}</li>
             <li>Check your network connection</li>
             <li>Verify no firewall is blocking the connection</li>
             <li>Try refreshing the page or restarting the backend</li>

@@ -12,13 +12,14 @@ export function detectAndParseTable(content: string): TableData | null {
   const lines = normalizedContent.split('\n');
   
   // Look for table patterns - markdown tables typically have | characters
-  const potentialTableLines = lines.filter(line => 
-    line.trim().includes('|') && 
-    line.trim().split('|').length >= 3 // At least 2 columns plus empty edges
-  );
+  const potentialTableLines = lines.filter(line => {
+    const trimmed = line.trim();
+    return trimmed.includes('|') && 
+           trimmed.split('|').length >= 4; // At least 3 columns (4 pipes including edges)
+  });
   
-  if (potentialTableLines.length < 2) {
-    return null; // Need at least header and one data row
+  if (potentialTableLines.length < 3) { // Require header + separator + at least 1 data row
+    return null;
   }
   
   // Find the start of the table
@@ -91,6 +92,29 @@ export function detectAndParseTable(content: string): TableData | null {
     return null;
   }
   
+  // Additional validation: ensure this looks like actual tabular data
+  // Check that we have reasonable headers and data
+  if (headers.length < 2 || headers.length > 20) {
+    return null; // Too few or too many columns
+  }
+  
+  // Check header quality - they should be reasonable column names
+  const hasReasonableHeaders = headers.every(header => 
+    header.length > 0 && 
+    header.length < 100 && // Not too long
+    // Allow multi-word headers but reject obvious sentences (more than 6 words or ending with period)
+    !(header.split(/\s+/).length > 6 || header.trim().endsWith('.') || header.trim().endsWith('!') || header.trim().endsWith('?'))
+  );
+  
+  if (!hasReasonableHeaders) {
+    return null;
+  }
+  
+  // Require at least 2 data rows for a valid table
+  if (rows.length < 2) {
+    return null;
+  }
+  
   // Try to extract a title from content before the table
   let title: string | undefined;
   const contentBeforeTable = lines.slice(0, tableStartIndex).join('\n').trim();
@@ -132,54 +156,78 @@ export function detectMultipleTableFormats(content: string): TableData | null {
   let result = detectAndParseTable(content);
   if (result) return result;
   
-  // Try to detect CSV-like format
+  // Try to detect CSV-like format - but be more strict
   const lines = content.trim().split('\n');
   
-  // Look for comma-separated values
+  // Look for comma-separated values - require at least 3 lines and consistent column count
   const csvLines = lines.filter(line => 
     line.includes(',') && 
-    line.split(',').length >= 2
+    line.split(',').length >= 3 && // At least 3 columns
+    !line.trim().startsWith('//') && // Not a comment
+    !line.trim().startsWith('#') // Not a markdown heading
   );
   
-  if (csvLines.length >= 2) {
+  if (csvLines.length >= 3) { // Require at least header + 2 data rows
     const headers = csvLines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    const rows = csvLines.slice(1).map(line => 
-      line.split(',').map(cell => cell.trim().replace(/"/g, ''))
-    );
     
-    // Validate that all rows have the same number of columns
-    const validRows = rows.filter(row => row.length === headers.length);
+    // Check if this looks like actual headers (not just random text with commas)
+    const looksLikeHeaders = headers.length >= 3 && 
+      headers.every(h => h.length > 0 && h.length < 100) && // Reasonable header length
+      // Allow multi-word headers but reject obvious sentences
+      !headers.some(h => h.split(/\s+/).length > 6 || h.trim().endsWith('.') || h.trim().endsWith('!') || h.trim().endsWith('?'));
     
-    if (validRows.length > 0) {
-      return {
-        headers,
-        rows: validRows,
-        title: 'Data Table'
-      };
+    if (looksLikeHeaders) {
+      const rows = csvLines.slice(1).map(line => 
+        line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+      );
+      
+      // Validate that all rows have the same number of columns
+      const validRows = rows.filter(row => row.length === headers.length);
+      
+      // Require at least 70% of rows to be valid
+      if (validRows.length > 0 && validRows.length >= rows.length * 0.7) {
+        return {
+          headers,
+          rows: validRows,
+          title: 'Data Table'
+        };
+      }
     }
   }
   
-  // Try to detect tab-separated values
+  // Try to detect tab-separated values - also be more strict
   const tabLines = lines.filter(line => 
     line.includes('\t') && 
-    line.split('\t').length >= 2
+    line.split('\t').length >= 3 &&
+    !line.trim().startsWith('//') &&
+    !line.trim().startsWith('#')
   );
   
-  if (tabLines.length >= 2) {
+  if (tabLines.length >= 3) { // Require at least header + 2 data rows
     const headers = tabLines[0].split('\t').map(h => h.trim());
-    const rows = tabLines.slice(1).map(line => 
-      line.split('\t').map(cell => cell.trim())
-    );
     
-    // Validate that all rows have the same number of columns
-    const validRows = rows.filter(row => row.length === headers.length);
+    // Check if this looks like actual headers
+    const looksLikeHeaders = headers.length >= 3 && 
+      headers.every(h => h.length > 0 && h.length < 100) &&
+      // Allow multi-word headers but reject obvious sentences
+      !headers.some(h => h.split(/\s+/).length > 6 || h.trim().endsWith('.') || h.trim().endsWith('!') || h.trim().endsWith('?'));
     
-    if (validRows.length > 0) {
-      return {
-        headers,
-        rows: validRows,
-        title: 'Data Table'
-      };
+    if (looksLikeHeaders) {
+      const rows = tabLines.slice(1).map(line => 
+        line.split('\t').map(cell => cell.trim())
+      );
+      
+      // Validate that all rows have the same number of columns
+      const validRows = rows.filter(row => row.length === headers.length);
+      
+      // Require at least 70% of rows to be valid
+      if (validRows.length > 0 && validRows.length >= rows.length * 0.7) {
+        return {
+          headers,
+          rows: validRows,
+          title: 'Data Table'
+        };
+      }
     }
   }
   

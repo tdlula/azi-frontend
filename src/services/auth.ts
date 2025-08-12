@@ -1,7 +1,8 @@
 import axios, { type AxiosInstance } from 'axios';
 import type { LoginCredentials, RegisterData, AuthResponse, User } from '@/types/auth';
+import { getApiBaseUrl } from '@/lib/env';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_BASE_URL = getApiBaseUrl();
 
 class AuthService {
   private api: AxiosInstance;
@@ -19,7 +20,14 @@ class AuthService {
     this.api.interceptors.request.use((config) => {
       const token = this.getToken();
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        // Check if token is likely expired before making request
+        if (this.isTokenLikelyExpired()) {
+          console.warn('🔑 Token appears to be expired, clearing it');
+          this.clearToken();
+          // Don't include the expired token in the request
+        } else {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
       return config;
     });
@@ -29,10 +37,22 @@ class AuthService {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Token expired or invalid
-          this.clearToken();
-          // Optionally redirect to login
-          window.location.href = '/login';
+          // Only logout on specific auth-related errors, not all 401s
+          const errorMessage = error.response?.data?.message || '';
+          const isAuthError = errorMessage.includes('Invalid or expired token') || 
+                            errorMessage.includes('Authentication failed') ||
+                            errorMessage.includes('No authentication token provided');
+          
+          if (isAuthError) {
+            console.log('🔑 Auth token invalid, logging out');
+            this.clearToken();
+            // Only redirect if we're not already on the login page
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
+          } else {
+            console.warn('⚠️ Received 401 but not an auth error:', errorMessage);
+          }
         }
         return Promise.reject(error);
       }
@@ -50,6 +70,25 @@ class AuthService {
 
   clearToken(): void {
     localStorage.removeItem('auth_token');
+  }
+
+  // Check if token is likely expired (client-side check)
+  isTokenLikelyExpired(): boolean {
+    const token = this.getToken();
+    if (!token) return true;
+
+    try {
+      // Decode JWT payload (without verification since we don't have the secret)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expirationTime = payload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      
+      // Consider token expired if it expires within the next 5 minutes
+      return currentTime >= (expirationTime - 5 * 60 * 1000);
+    } catch (error) {
+      console.warn('Failed to decode token, considering it expired:', error);
+      return true;
+    }
   }
 
   // API methods
@@ -104,13 +143,36 @@ class AuthService {
       return { valid: response.data.success, user: response.data.user };
     } catch (error: any) {
       console.error('❌ Verify token failed:', error.response?.status, error.response?.data || error.message);
-      return { valid: false };
+      
+      // If it's a network error or server error (not auth), don't immediately invalidate
+      if (!error.response) {
+        console.warn('🌐 Network error during token verification, assuming valid for now');
+        return { valid: true }; // Assume valid on network errors
+      }
+      
+      // Only treat as invalid for actual auth errors (401 with auth message)
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.message || '';
+        const isAuthError = errorMessage.includes('Invalid or expired token') || 
+                          errorMessage.includes('Authentication failed');
+        
+        if (isAuthError) {
+          return { valid: false };
+        } else {
+          console.warn('⚠️ 401 but not an auth error, assuming valid');
+          return { valid: true };
+        }
+      }
+      
+      // For other errors (500, etc), assume valid
+      return { valid: true };
     }
   }
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    return !!token && !this.isTokenLikelyExpired();
   }
 }
 

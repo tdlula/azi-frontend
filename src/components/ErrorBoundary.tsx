@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
+import { isDevelopment } from '@/lib/env';
 // import { logError } from '@/lib/sentry';
 
 interface Props {
@@ -82,7 +83,7 @@ class ErrorBoundary extends Component<Props, State> {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {isDevelopment() && this.state.error && (
                 <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
                   <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
                     Error Details (Development):

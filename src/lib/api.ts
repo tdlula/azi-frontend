@@ -1,25 +1,26 @@
+import { getApiBaseUrl, isDevelopment, isDebugApiEnabled, getEnvironmentConfig } from './env';
+
 // API Configuration for Development and Production
 const API_CONFIG = {
   development: {
     baseURL: '', // Uses Vite proxy in development
   },
   production: {
-    baseURL: import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || 'http://129.151.191.161:7000',
+    baseURL: getApiBaseUrl(),
   }
 };
 
 // Determine environment
-const isDevelopment = import.meta.env.DEV;
-const environment = isDevelopment ? 'development' : 'production';
+const environment = isDevelopment() ? 'development' : 'production';
 
 // Get base URL for API calls
-export const getApiBaseUrl = (): string => {
+export const getApiUrl = (): string => {
   return API_CONFIG[environment].baseURL;
 };
 
 // Create API URL helper
 export const createApiUrl = (endpoint: string): string => {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getApiUrl();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 };
@@ -40,7 +41,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}): Prom
   });
 
   // Log for debugging in development
-  if (isDevelopment) {
+  if (isDevelopment()) {
     console.log(`API Call: ${options.method || 'GET'} ${url} - ${response.status}`);
   }
 
@@ -91,10 +92,4 @@ export const getCacheStatus = async (): Promise<any> => {
 };
 
 // Export environment info for debugging
-export const getEnvironmentInfo = () => ({
-  isDevelopment,
-  environment,
-  baseUrl: getApiBaseUrl(),
-  mode: import.meta.env.MODE,
-  viteEnv: import.meta.env
-});
+export const getEnvironmentInfo = () => getEnvironmentConfig();

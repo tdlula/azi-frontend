@@ -54,6 +54,13 @@ import { detectMultipleTableFormats, hasTableData } from "@/utils/tableDetection
 import ReportGenerator from "@/components/ReportGenerator";
 import { CacheManager } from "@/utils/cacheUtils";
 import { fetchEnhancedReportDataCached, EnhancedReportData } from "@/utils/enhancedReportData";
+import { 
+  loadAIResponseDefinitions, 
+  formatTextWithAIDefinitions, 
+  renderFormattedLineWithDefinitions,
+  enhanceAIResponse,
+  applyContextualFormatting 
+} from "@/utils/aiResponseFormatter";
 
 // Generate unique IDs for messages to prevent React key warnings
 let messageIdCounter = 0;
@@ -80,63 +87,95 @@ interface Suggestion {
   color: string;
 }
 
-// Function to render message content with table detection
-const renderMessageContent = (content: string) => {
-  // First check if the content contains table data
+// Function to detect and extract chart data from AI response text
+const detectChartFromResponse = (content: string) => {
+  // Check if response contains chart instructions
+  const chartIndicators = [
+    'line chart', 'bar chart', 'pie chart', 'area chart', 'scatter plot',
+    'chart data:', 'visualization notes:', 'x-axis:', 'y-axis:',
+    'plotting', 'curve peaks', 'trends', 'distribution',
+    'structured to allow plotting', 'visualization', 'dataset'
+  ];
+  
+  const hasChartContent = chartIndicators.some(indicator => 
+    content.toLowerCase().includes(indicator.toLowerCase())
+  );
+  
+  if (!hasChartContent) return null;
+  
+  // Try to extract chart type
+  let chartType = 'line'; // default
+  if (content.toLowerCase().includes('bar chart')) chartType = 'bar';
+  else if (content.toLowerCase().includes('pie chart')) chartType = 'pie';
+  else if (content.toLowerCase().includes('area chart')) chartType = 'area';
+  else if (content.toLowerCase().includes('scatter')) chartType = 'scatter';
+  
+  // Try to extract chart title - multiple patterns
+  let title = 'Data Visualization';
+  
+  // Pattern 1: Markdown heading
+  const titleMatch1 = content.match(/(?:^|\n)#\s*(.+?)(?:\n|$)/m);
+  if (titleMatch1) title = titleMatch1[1].trim();
+  
+  // Pattern 2: Chart Data: prefix
+  const titleMatch2 = content.match(/(?:Line Chart Data:|Chart Data:|Bar Chart Data:|Pie Chart Data:)\s*(.+?)(?:\n|$)/i);
+  if (titleMatch2) title = titleMatch2[1].trim();
+  
+  // Pattern 3: Title in visualization notes
+  const titleMatch3 = content.match(/Title:\s*(.+?)(?:\n|$)/i);
+  if (titleMatch3) title = titleMatch3[1].trim();
+  
+  // Try to detect table data that can be used for charting
   const tableData = detectMultipleTableFormats(content);
   
-  if (tableData) {
-    // Extract non-table content (content before and after table)
-    const lines = content.split('\n');
-    let tableStartIndex = -1;
-    let tableEndIndex = -1;
+  if (tableData && tableData.headers.length >= 2) {
+    // Convert table data to chart format
+    const xAxisLabel = tableData.headers[0];
+    const yAxisLabel = tableData.headers[1];
     
-    // Find table boundaries in the content
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.includes('|') && line.split('|').length >= 3) {
-        if (tableStartIndex === -1) {
-          tableStartIndex = i;
+    // Handle numeric data conversion more robustly
+    const chartData = {
+      type: chartType,
+      title: title,
+      data: tableData.rows.map((row, index) => {
+        // Try to parse the second column as a number (Y-axis value)
+        let value = 0;
+        if (row[1]) {
+          // Handle various number formats (6.5, 8, 9, etc.)
+          const numStr = row[1].toString().replace(/[^\d.-]/g, '');
+          value = parseFloat(numStr) || 0;
         }
-        tableEndIndex = i;
+        
+        return {
+          name: row[0] || `Item ${index + 1}`,
+          value: value,
+          category: row[2] || '',
+          description: row[3] || '',
+          // Keep original data for reference
+          originalRow: row
+        };
+      }),
+      xAxis: xAxisLabel,
+      yAxis: yAxisLabel,
+      metadata: {
+        source: 'ai_response_extraction',
+        originalTable: tableData,
+        detectedType: chartType,
+        confidence: 0.8
       }
+    };
+    
+    // Validate that we have meaningful chart data
+    const hasValidData = chartData.data.length > 0 && 
+                        chartData.data.some(item => item.value > 0);
+    
+    if (hasValidData) {
+      console.log('[Chart Detection] Extracted chart data:', chartData);
+      return chartData;
     }
-    
-    const beforeTable = tableStartIndex > 0 ? lines.slice(0, tableStartIndex).join('\n').trim() : '';
-    const afterTable = tableEndIndex < lines.length - 1 ? lines.slice(tableEndIndex + 1).join('\n').trim() : '';
-    
-    return (
-      <div>
-        {beforeTable && (
-          <div className="prose prose-sm max-w-none mb-4 text-white">
-            {beforeTable.split('\n').map((line: string, index: number) => {
-              if (line.trim() === '') return <br key={index} />;
-              return <p key={index} className="mb-2 leading-relaxed text-white">{line}</p>;
-            })}
-          </div>
-        )}
-        <DataTable data={tableData} title={tableData.title} />
-        {afterTable && (
-          <div className="prose prose-sm max-w-none mt-4 text-white">
-            {afterTable.split('\n').map((line: string, index: number) => {
-              if (line.trim() === '') return <br key={index} />;
-              return <p key={index} className="mb-2 leading-relaxed text-white">{line}</p>;
-            })}
-          </div>
-        )}
-      </div>
-    );
   }
   
-  // No table detected, render as normal text
-  return (
-    <div className="prose prose-sm max-w-none text-white">
-      {content.split('\n').map((line: string, index: number) => {
-        if (line.trim() === '') return <br key={index} />;
-        return <p key={index} className="mb-2 leading-relaxed text-white">{line}</p>;
-      })}
-    </div>
-  );
+  return null;
 };
 
 export default function SimpleChatFixedPage() {
@@ -148,6 +187,10 @@ export default function SimpleChatFixedPage() {
   const isLoading = state.isLoading;
   const isSuggestionsLoading = state.isSuggestionsLoading;
   const [input, setInput] = useState("");
+  const [conversationId, setConversationId] = useState<string>(() => {
+    // Generate a unique conversation ID for this chat session
+    return `conversation:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  });
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -166,6 +209,185 @@ export default function SimpleChatFixedPage() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [enhancedReportData, setEnhancedReportData] = useState<EnhancedReportData | null>(null);
   const [isLoadingEnhancedData, setIsLoadingEnhancedData] = useState(false);
+  
+  // AI Response Definitions state
+  const [aiResponseDefinitions, setAIResponseDefinitions] = useState(null);
+  const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
+
+  // Enhanced function to format text according to AI response definitions (moved inside component)
+  const formatTextWithDefinitions = (text: string, definitions: any = null) => {
+    let formattedText = text;
+    
+    // Handle bold text (**text**)
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-yellow-300">$1</strong>');
+    
+    // Handle source citations 【message idx:search idx†Radio Station Name】
+    formattedText = formattedText.replace(/【([^】]+)】/g, '<span class="inline-block bg-blue-600/20 text-blue-300 px-2 py-1 rounded text-xs font-mono border border-blue-500/30 ml-1" title="Source Citation">$1</span>');
+    
+    // Handle currency (R##.##)
+    formattedText = formattedText.replace(/\bR(\d+(?:\.\d{2})?)\b/g, '<span class="font-semibold text-green-400" title="South African Rands">R$1</span>');
+    
+    // Handle quoted content ("text")
+    formattedText = formattedText.replace(/"([^"]+)"/g, '<span class="italic text-gray-300 border-l-2 border-gray-500 pl-2" title="Quoted Content">"$1"</span>');
+    
+    // Handle abbreviations with clarifications - pattern: Full Name (Abbreviation)
+    formattedText = formattedText.replace(/\b([A-Z][A-Za-z\s]+)\s*\(([A-Z]{2,})\)/g, '<span class="text-blue-300">$1</span> (<span class="font-semibold text-blue-400" title="Abbreviation">$2</span>)');
+    
+    // Handle program and station identification - "Program Name on Station Name"
+    formattedText = formattedText.replace(/\b([A-Z][A-Za-z\s]+)\s+on\s+([A-Z][A-Za-z\s]+)\b/g, '<span class="text-purple-300 font-medium" title="Program">$1</span> on <span class="text-purple-400 font-semibold" title="Radio Station">$2</span>');
+    
+    // Handle clarification formatting for technical terms
+    formattedText = formattedText.replace(/\b([A-Z]{2,})\s*\(([^)]+)\)/g, '<span class="font-semibold text-cyan-400" title="$2">$1</span> <span class="text-sm text-gray-400">($2)</span>');
+    
+    return formattedText;
+  };
+
+  // Enhanced function to render a single line with formatting (moved inside component)
+  const renderFormattedLine = (line: string, index: number, definitions: any = null) => {
+    const trimmedLine = line.trim();
+    
+    // Empty line
+    if (trimmedLine === '') return <br key={index} />;
+    
+    // Header (## Header Text)
+    if (trimmedLine.startsWith('## ')) {
+      const headerText = trimmedLine.slice(3);
+      return (
+        <h3 key={index} className="text-lg font-bold text-white mb-3 mt-4 border-b border-gray-600 pb-1">
+          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(headerText, definitions) }} />
+        </h3>
+      );
+    }
+    
+    // Single # headers
+    if (trimmedLine.startsWith('# ')) {
+      const headerText = trimmedLine.slice(2);
+      return (
+        <h2 key={index} className="text-xl font-bold text-white mb-4 mt-5 border-b-2 border-gray-500 pb-2">
+          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(headerText, definitions) }} />
+        </h2>
+      );
+    }
+    
+    // Bullet points (- item or * item)
+    if (trimmedLine.match(/^[-*]\s+/)) {
+      const bulletText = trimmedLine.replace(/^[-*]\s+/, '');
+      return (
+        <div key={index} className="flex items-start mb-2">
+          <span className="text-yellow-400 mr-3 mt-1">•</span>
+          <span className="text-white leading-relaxed" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(bulletText, definitions) }} />
+        </div>
+      );
+    }
+    
+    // Numbered lists (1. item, 2. item, etc.)
+    if (trimmedLine.match(/^\d+\.\s+/)) {
+      const match = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+      if (match) {
+        const [, number, text] = match;
+        return (
+          <div key={index} className="flex items-start mb-2">
+            <span className="text-blue-400 font-semibold mr-3 mt-1 min-w-[20px]">{number}.</span>
+            <span className="text-white leading-relaxed" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(text, definitions) }} />
+          </div>
+        );
+      }
+    }
+    
+    // Blockquotes (> text)
+    if (trimmedLine.startsWith('> ')) {
+      const quoteText = trimmedLine.slice(2);
+      return (
+        <blockquote key={index} className="border-l-4 border-gray-500 pl-4 py-2 my-3 bg-gray-800/30 italic text-gray-300">
+          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(quoteText, definitions) }} />
+        </blockquote>
+      );
+    }
+    
+    // Regular paragraph
+    return (
+      <p key={index} className="mb-2 leading-relaxed text-white">
+        <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(trimmedLine, definitions) }} />
+      </p>
+    );
+  };
+
+  // Function to render message content with enhanced formatting and table detection (moved inside component)
+  const renderMessageContent = (content: string) => {
+    // Check for potential table content with more nuanced detection
+    const lines = content.split('\n');
+    const pipeLines = lines.filter(line => line.includes('|'));
+    const commaLines = lines.filter(line => line.includes(','));
+    const tabLines = lines.filter(line => line.includes('\t'));
+    
+    const mightContainTable = (
+      // Markdown table: multiple lines with pipes, at least 3 lines (header + separator + data)
+      (pipeLines.length >= 3 && pipeLines.some(line => line.split('|').length >= 4)) ||
+      // CSV: multiple lines with commas, consistent structure
+      (commaLines.length >= 3 && commaLines.some(line => line.split(',').length >= 3)) ||
+      // TSV: multiple lines with tabs
+      (tabLines.length >= 3 && tabLines.some(line => line.split('\t').length >= 3))
+    ) && (
+      // Exclude clearly conversational content
+      !content.toLowerCase().match(/^(here are|the results|i found|let me|i'll|i can|based on)/i) &&
+      content.length > 50 // Reasonable minimum length
+    );
+
+    // Only attempt table detection if content seems table-like
+    if (mightContainTable) {
+      const tableData = detectMultipleTableFormats(content);
+      
+      if (tableData) {
+        // Extract non-table content (content before and after table)
+        const lines = content.split('\n');
+        let tableStartIndex = -1;
+        let tableEndIndex = -1;
+        
+        // Find table boundaries in the content
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.includes('|') && line.split('|').length >= 3) {
+            if (tableStartIndex === -1) {
+              tableStartIndex = i;
+            }
+            tableEndIndex = i;
+          }
+        }
+        
+        const beforeTable = tableStartIndex > 0 ? lines.slice(0, tableStartIndex).join('\n').trim() : '';
+        const afterTable = tableEndIndex < lines.length - 1 ? lines.slice(tableEndIndex + 1).join('\n').trim() : '';
+        
+        return (
+          <div>
+            {beforeTable && (
+              <div className="prose prose-sm max-w-none mb-4 text-white">
+                {beforeTable.split('\n').map((line: string, index: number) => 
+                  renderFormattedLine(line, index, aiResponseDefinitions)
+                )}
+              </div>
+            )}
+            <DataTable data={tableData} title={tableData.title} />
+            {afterTable && (
+              <div className="prose prose-sm max-w-none mt-4 text-white">
+                {afterTable.split('\n').map((line: string, index: number) => 
+                  renderFormattedLine(line, index, aiResponseDefinitions)
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+    }
+    
+    // No table detected or content doesn't look table-like, render with enhanced formatting
+    return (
+      <div className="prose prose-sm max-w-none text-white">
+        {lines.map((line: string, index: number) => 
+          renderFormattedLine(line, index, aiResponseDefinitions)
+        )}
+      </div>
+    );
+  };
 
   // Drill down modal state
   const [drillDownModal, setDrillDownModal] = useState<{
@@ -200,6 +422,20 @@ export default function SimpleChatFixedPage() {
       top: document.documentElement.scrollHeight, 
       behavior: "smooth" 
     });
+  };
+
+  const startNewConversation = () => {
+    // Generate a new conversation ID for a fresh thread
+    const newConversationId = `conversation:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setConversationId(newConversationId);
+    
+    // Clear all messages to start fresh
+    dispatch({ type: 'CLEAR_MESSAGES' });
+    
+    // Optionally clear input if there's any
+    setInput("");
+    
+    console.log('Started new conversation with ID:', newConversationId);
   };
 
   useEffect(() => {
@@ -265,6 +501,29 @@ export default function SimpleChatFixedPage() {
     }
   }, []);
 
+  // Load AI Response Definitions on component mount
+  useEffect(() => {
+    const loadDefinitions = async () => {
+      try {
+        const definitions = await loadAIResponseDefinitions();
+        if (definitions) {
+          setAIResponseDefinitions(definitions);
+          console.log('[AI Response] Definitions loaded successfully');
+        } else {
+          console.warn('[AI Response] No definitions available, using default formatting');
+        }
+      } catch (error) {
+        console.error('[AI Response] Failed to load definitions:', error);
+      } finally {
+        setDefinitionsLoaded(true);
+      }
+    };
+
+    if (!definitionsLoaded) {
+      loadDefinitions();
+    }
+  }, [definitionsLoaded]);
+
   const fetchSuggestions = async () => {
     // Fetch chart suggestions directly from backend
     try {
@@ -282,6 +541,9 @@ export default function SimpleChatFixedPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+
+    // Log conversation ID for thread management tracking
+    console.log('[Chat] Submitting message with conversation ID:', conversationId);
 
     const userMessage: Message = {
       id: generateUniqueId(),
@@ -457,7 +719,8 @@ export default function SimpleChatFixedPage() {
         },
         body: JSON.stringify({ 
           message: input,
-          conversationHistory: conversationHistory
+          conversationHistory: conversationHistory,
+          conversationId: conversationId
         }),
       });
 
@@ -475,13 +738,32 @@ export default function SimpleChatFixedPage() {
           };
           dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
         } else {
-          const aiMessage: Message = {
-            id: generateUniqueId(),
-            content: data.message || data.response || "I'm here to help with your data analysis needs.",
-            role: "assistant",
-            timestamp: new Date(),
-          };
-          dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          const responseContent = data.message || data.response || "I'm here to help with your data analysis needs.";
+          
+          // Check if the AI response contains chart instructions and data
+          const extractedChartData = detectChartFromResponse(responseContent);
+          
+          if (extractedChartData) {
+            console.log('[Chat] Detected chart data in AI response:', extractedChartData.title);
+            // Response contains chart data - create message with chart
+            const aiMessage: Message = {
+              id: generateUniqueId(),
+              content: responseContent,
+              role: "assistant",
+              timestamp: new Date(),
+              chartData: extractedChartData,
+            };
+            dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          } else {
+            // Regular text response
+            const aiMessage: Message = {
+              id: generateUniqueId(),
+              content: responseContent,
+              role: "assistant",
+              timestamp: new Date(),
+            };
+            dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          }
         }
       } else {
         throw new Error(`HTTP ${response.status}`);
@@ -1314,7 +1596,7 @@ export default function SimpleChatFixedPage() {
   };
 
   return (
-    <div className="chatbot-page min-h-screen w-full bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex flex-col">
+    <div className="chatbot-page w-full bg-background flex flex-col">
       {/* Main Content Area */}
       <div className="flex flex-col w-full">
         {/* Consistent Header */}
@@ -1461,7 +1743,29 @@ export default function SimpleChatFixedPage() {
             {/* Text Content - Center */}
             <div className="flex-1 text-center">
               <h2 className="chat-title text-lg sm:text-xl font-semibold text-white">AI Assistant</h2>
-              <p className="chat-subtitle text-blue-100 text-xs sm:text-sm">Ask me anything about your data</p>
+              <p className="chat-subtitle text-blue-100 text-xs sm:text-sm">
+                Ask me anything about your data
+                {process.env.NODE_ENV === 'development' && (
+                  <span className="ml-2 opacity-50 text-xs">
+                    • ID: {conversationId.split(':')[1]?.substring(0, 8)}...
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* New Conversation Button - Center Right */}
+            <div className="flex-shrink-0 mr-2">
+              <button
+                onClick={startNewConversation}
+                disabled={isLoading || isGeneratingReport || isLoadingEnhancedData}
+                title="Start a new conversation (creates a new thread)"
+                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors ${
+                  isLoading || isGeneratingReport || isLoadingEnhancedData ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">New Chat</span>
+              </button>
             </div>
 
             {/* Settings Dropdown - Right side */}
@@ -1528,10 +1832,10 @@ export default function SimpleChatFixedPage() {
           {/* Chat Container - Full Width */}
           <div className="chat-container flex-1 w-full overflow-hidden">
             {/* Chat Wrapper */}
-            <div className="chat-wrapper h-full flex flex-col">
+            <div className="chat-wrapper flex flex-col">
 
             {/* Messages Area */}
-            <div className="messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent pb-24 sm:pb-28 md:pb-32" style={{ minHeight: '200vh' }}>
+            <div className="messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent pb-24 sm:pb-28 md:pb-32">
               {/* Top Reference Point */}
               <div ref={messagesTopRef} />
               {/* ...existing code for messages... */}

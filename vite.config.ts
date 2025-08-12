@@ -4,8 +4,10 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const isDev = env.ENVIRONMENT !== 'production';
-  const backendUrl = isDev ? `http://localhost:${env.BACKEND_PORT}` : `http://${env.BACKEND_SERVER}:${env.BACKEND_PORT}`;
+  const isDev = env.VITE_ENV !== 'production';
+  const backendUrl = isDev ? `http://localhost:${env.DEV_BACKEND_PORT}` : `http://${env.PROD_BACKEND_SERVER}:${env.PROD_BACKEND_PORT}`;
+  const frontendPort = isDev ? env.DEV_FRONTEND_PORT : env.PROD_FRONTEND_PORT;
+  
   return {
     plugins: [react()],
     resolve: {
@@ -14,7 +16,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: Number(env.FRONTEND_PORT) || 3000,
+      port: Number(frontendPort) || 3000,
       proxy: {
         '/api': {
           target: backendUrl,
@@ -35,9 +37,9 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'process.env': {
-        BACKEND_PORT: env.BACKEND_PORT,
-        BACKEND_SERVER: env.BACKEND_SERVER,
-        ENVIRONMENT: env.ENVIRONMENT,
+        BACKEND_PORT: isDev ? env.DEV_BACKEND_PORT : env.PROD_BACKEND_PORT,
+        BACKEND_SERVER: isDev ? 'localhost' : env.PROD_BACKEND_SERVER,
+        ENVIRONMENT: env.VITE_ENV,
       },
       __BACKEND_URL__: JSON.stringify(backendUrl),
     },

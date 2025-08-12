@@ -15,15 +15,17 @@ interface ChartRendererProps {
 // Chart wrapper component to include AI insights
 function ChartWithInsights({ children, chartData }: { children: React.ReactNode; chartData: ChartData }) {
   return (
-    <div className="chart-container">
-      {children}
+    <div className="chart-container bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 mb-4">
+      <div className="chart-content">
+        {children}
+      </div>
       {(chartData as any).aiInsight && (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/40">
-          <p className="text-sm text-muted-foreground italic">
+        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-300 italic">
             {(chartData as any).aiInsight}
           </p>
           {(chartData as any).sourceInfo && (
-            <p className="text-xs text-muted-foreground/70 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {(chartData as any).sourceInfo}
             </p>
           )}
@@ -285,6 +287,21 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
     const baseConfig = {
       chart: {
         background: 'transparent',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        foreColor: isDark ? '#e5e7eb' : '#374151',
+        animations: {
+          enabled: true,
+          easing: 'easeinout',
+          speed: 400,
+          animateGradually: {
+            enabled: true,
+            delay: 50
+          },
+          dynamicAnimation: {
+            enabled: true,
+            speed: 200
+          }
+        },
         events: {
           dataPointSelection: function(event: any, chartContext: any, config: any) {
             if (onChartClick) {
@@ -305,7 +322,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           offsetY: 0,
           tools: {
             download: true,
-            selection: true,
+            selection: false,
             zoom: true,
             zoomin: true,
             zoomout: true,
@@ -330,7 +347,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           autoScaleYaxis: true
         },
         selection: {
-          enabled: true
+          enabled: false
         }
       },
       theme: {
@@ -341,14 +358,56 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         theme: (isDark ? 'dark' : 'light') as 'dark' | 'light',
         style: {
           fontSize: '12px',
-          fontFamily: 'inherit'
+          fontFamily: 'Inter, system-ui, sans-serif'
+        },
+        x: {
+          show: true
+        },
+        y: {
+          formatter: function (val: number) {
+            return typeof val === 'number' ? val.toLocaleString() : val
+          }
         }
       },
       legend: {
-        show: true
+        show: true,
+        position: 'bottom' as const,
+        horizontalAlign: 'center' as const,
+        fontSize: '12px',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        markers: {
+          size: 8,
+          strokeWidth: 0,
+          fillColors: undefined,
+          shape: 'circle' as const,
+          offsetX: 0,
+          offsetY: 0
+        }
       },
       grid: {
-        show: true
+        show: true,
+        borderColor: isDark ? '#374151' : '#e5e7eb',
+        strokeDashArray: 1,
+        position: 'back' as const,
+        xaxis: {
+          lines: {
+            show: true
+          }
+        },
+        yaxis: {
+          lines: {
+            show: true
+          }
+        },
+        padding: {
+          top: 10,
+          right: 10,
+          bottom: 10,
+          left: 10
+        }
+      },
+      stroke: {
+        width: 2
       }
     };
 
@@ -455,7 +514,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       try {
         return (
           <ChartWithInsights chartData={chartData}>
-            <Chart options={barOptions} series={barSeries} type="bar" height={520} />
+            <Chart options={barOptions} series={barSeries} type="bar" height={280} />
           </ChartWithInsights>
         );
       } catch (chartError) {
@@ -621,28 +680,68 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
             categories: processedData.map(item => item.name),
             labels: {
               style: {
-                fontSize: '12px',
-                fontWeight: 'bold'
+                fontSize: '11px',
+                fontWeight: '500',
+                fontFamily: 'Inter, system-ui, sans-serif',
+                colors: isDark ? '#9ca3af' : '#6b7280'
               },
-              maxHeight: 120,
-              rotate: -45
+              maxHeight: 60,
+              rotate: -45,
+              rotateAlways: false,
+              hideOverlappingLabels: true,
+              trim: true
+            },
+            axisBorder: {
+              show: true,
+              color: isDark ? '#374151' : '#e5e7eb'
+            },
+            axisTicks: {
+              show: true,
+              color: isDark ? '#374151' : '#e5e7eb'
+            },
+            crosshairs: {
+              show: true,
+              width: 1,
+              position: 'back',
+              opacity: 0.3,
+              stroke: {
+                color: isDark ? '#6b7280' : '#9ca3af',
+                width: 1,
+                dashArray: 3
+              }
             }
           },
           yaxis: {
             labels: {
               style: {
-                fontSize: '12px'
+                fontSize: '11px',
+                fontWeight: '500',
+                fontFamily: 'Inter, system-ui, sans-serif',
+                colors: isDark ? '#9ca3af' : '#6b7280'
+              },
+              formatter: function (val: number) {
+                return typeof val === 'number' ? val.toLocaleString() : val
               }
+            },
+            axisBorder: {
+              show: true,
+              color: isDark ? '#374151' : '#e5e7eb'
+            },
+            axisTicks: {
+              show: true,
+              color: isDark ? '#374151' : '#e5e7eb'
             }
           },
           title: {
             text: chartTitle,
             style: {
-              fontSize: '16px',
-              fontWeight: 'bold',
-              color: isDark ? '#ffffff' : '#333333'
+              fontSize: '14px',
+              fontWeight: '600',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              color: isDark ? '#f9fafb' : '#111827'
             },
-            margin: 10
+            margin: 15,
+            offsetY: 10
           },
           grid: {
             padding: {
@@ -655,31 +754,24 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           colors: dynamicColors,
           stroke: {
             curve: 'smooth' as const,
-            width: 3,
-            colors: dynamicColors
+            width: 2,
+            colors: dynamicColors,
+            lineCap: 'round' as const
           },
           fill: {
-            type: 'gradient',
-            gradient: {
-              shade: 'light',
-              type: 'vertical',
-              shadeIntensity: 0.3,
-              gradientToColors: gradientColors,
-              inverseColors: false,
-              opacityFrom: 0.4,
-              opacityTo: 0.1,
-              stops: [0, 100]
-            }
+            type: 'solid',
+            opacity: 0.1,
+            colors: dynamicColors
           },
           markers: {
-            size: 8,
-            strokeWidth: 3,
-            strokeColors: '#fff',
+            size: 5,
+            strokeWidth: 2,
+            strokeColors: isDark ? '#1f2937' : '#ffffff',
             fillOpacity: 1,
             colors: dynamicColors,
             hover: {
-              size: 12,
-              sizeOffset: 3
+              size: 8,
+              sizeOffset: 2
             }
           },
           tooltip: {
@@ -697,7 +789,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       try {
         return (
           <ChartWithInsights chartData={chartData}>
-            <Chart options={lineOptions} series={lineSeries} type="line" height={520} />
+            <Chart options={lineOptions} series={lineSeries} type="line" height={280} />
           </ChartWithInsights>
         );
       } catch (chartError) {
@@ -713,7 +805,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           ...baseConfig.chart,
           type: 'donut' as const,
           width: '100%',
-          height: 450,
+          height: 280,
           events: {
             ...baseConfig.chart.events,
             dataPointSelection: function(event: any, chartContext: any, config: any) {
@@ -1036,7 +1128,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
 
       return (
         <ChartWithInsights chartData={chartData}>
-          <Chart options={areaOptions} series={areaSeries} type="area" height={520} />
+          <Chart options={areaOptions} series={areaSeries} type="area" height={280} />
         </ChartWithInsights>
       );
 
@@ -1105,7 +1197,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
 
       return (
         <ChartWithInsights chartData={chartData}>
-          <Chart options={scatterOptions} series={scatterSeries} type="scatter" height={520} />
+          <Chart options={scatterOptions} series={scatterSeries} type="scatter" height={280} />
         </ChartWithInsights>
       );
 
@@ -1245,7 +1337,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       try {
         return (
           <ChartWithInsights chartData={chartData}>
-            <Chart options={radarOptions} series={radarSeries} type="radar" height={520} />
+            <Chart options={radarOptions} series={radarSeries} type="radar" height={280} />
           </ChartWithInsights>
         );
       } catch (chartError) {

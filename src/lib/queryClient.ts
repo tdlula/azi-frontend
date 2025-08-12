@@ -1,10 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { logApiRequest, logError, logPerformance } from "./sentry";
+import { getBackendServer, getBackendPort, getApiBaseUrl } from "./env";
 
-// API Configuration - Backend detection and fallback
-const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '5000';
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || 'localhost';
-const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
+// API Configuration using environment helper
+const BACKEND_PORT = getBackendPort().toString();
+const BACKEND_HOST = getBackendServer();
+const API_BASE_URL = getApiBaseUrl();
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

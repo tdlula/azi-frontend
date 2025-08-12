@@ -8,6 +8,7 @@ import DateRangePicker, { getDefaultDateRange } from "@/components/DateRangePick
 import ReportGenerator from "@/components/ReportGenerator";
 import MetricsSection from "@/components/MetricsSection";
 import ChartsSection from "@/components/ChartsSection";
+import { isDevelopment } from "@/lib/env";
 import WordCloudSection from "@/components/WordCloudSection";
 import useLazyLoading from "@/hooks/useLazyLoading";
 import { useState, useEffect, useRef } from "react";
@@ -410,7 +411,7 @@ export default function DashboardMinimal() {
 
   // Setup integration test in browser console (development aid)
   useEffect(() => {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    if (typeof window !== 'undefined' && isDevelopment()) {
       (window as any).testIntegration = testFrontendBackendIntegration;
       console.log('🔧 Integration test available: testIntegration()');
     }
@@ -727,10 +728,10 @@ Return analysis with specific transcript excerpts, quantified insights, and data
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <AppHeader />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Navigation */}
         <div className="flex justify-between items-center mb-6 sm:mb-8">
           <div>
@@ -924,7 +925,7 @@ Return analysis with specific transcript excerpts, quantified insights, and data
         )}
 
         {/* Hidden Report Container for PDF Generation */}
-        <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '1200px' }}>
+        <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '1200px', zIndex: -1 }}>
           <ReportGenerator
             ref={reportRef}
             data={{

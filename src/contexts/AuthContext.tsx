@@ -27,6 +27,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
   }, []);
 
+  // Set up periodic token verification (every 30 minutes)
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+
+    const interval = setInterval(async () => {
+      console.log('🔄 Periodic token verification...');
+      
+      // Check if token is expired client-side first
+      if (authService.isTokenLikelyExpired()) {
+        console.log('🔑 Token expired client-side, logging out');
+        await logout();
+        return;
+      }
+
+      try {
+        const verification = await authService.verifyToken();
+        if (!verification.valid) {
+          console.log('🔑 Token verification failed, logging out');
+          await logout();
+        } else if (verification.user && !authState.user) {
+          // Update user data if we didn't have it before
+          setAuthState(prev => ({ ...prev, user: verification.user || null }));
+        }
+      } catch (error) {
+        console.warn('⚠️ Periodic token verification failed, will retry next time:', error);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+
+    return () => clearInterval(interval);
+  }, [authState.isAuthenticated]);
+
   const initializeAuth = async () => {
     const token = authService.getToken();
     
@@ -53,6 +84,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isAuthenticated: true,
           isLoading: false,
         });
+      } else if (verification.valid && !verification.user) {
+        // Token is valid but no user data (network issue), keep authenticated
+        console.log('⚠️ Token valid but no user data, keeping authenticated');
+        setAuthState({
+          user: null,
+          token,
+          isAuthenticated: true,
+          isLoading: false,
+        });
       } else {
         // Token is invalid
         console.log('❌ Token verification failed, clearing token');
@@ -66,11 +106,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('❌ Auth initialization failed:', error);
-      authService.clearToken();
+      // Don't immediately logout on network errors
+      console.log('⚠️ Network error during auth init, keeping token for now');
       setAuthState({
         user: null,
-        token: null,
-        isAuthenticated: false,
+        token,
+        isAuthenticated: true, // Keep authenticated on network errors
         isLoading: false,
       });
     }
@@ -115,10 +156,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const user = await authService.getCurrentUser();
       setAuthState(prev => ({ ...prev, user }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to refresh user:', error);
-      // If refresh fails, logout
-      await logout();
+      
+      // Only logout on auth errors, not network errors
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.message || '';
+        const isAuthError = errorMessage.includes('Invalid or expired token') || 
+                          errorMessage.includes('Authentication failed');
+        
+        if (isAuthError) {
+          console.log('🔑 Auth error during user refresh, logging out');
+          await logout();
+        }
+      }
     }
   };
 

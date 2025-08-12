@@ -74,6 +74,7 @@ type AppAction =
   | { type: 'SET_CURRENT_CONVERSATION'; payload: number | null }
   | { type: 'SET_MESSAGES'; payload: Message[] }
   | { type: 'ADD_MESSAGE'; payload: Message }
+  | { type: 'CLEAR_MESSAGES' }
   | { type: 'SET_SUGGESTIONS'; payload: any[] }
   | { type: 'SET_SUGGESTIONS_LOADING'; payload: boolean }
   | { type: 'SET_DASHBOARD_DATA'; payload: DashboardData }
@@ -124,6 +125,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { 
         ...state, 
         messages: [...state.messages, action.payload],
+        lastActivity: new Date()
+      };
+    
+    case 'CLEAR_MESSAGES':
+      return { 
+        ...state, 
+        messages: [],
         lastActivity: new Date()
       };
     
