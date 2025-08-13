@@ -41,7 +41,8 @@ class AuthService {
           const errorMessage = error.response?.data?.message || '';
           const isAuthError = errorMessage.includes('Invalid or expired token') || 
                             errorMessage.includes('Authentication failed') ||
-                            errorMessage.includes('No authentication token provided');
+                            errorMessage.includes('No authentication token provided') ||
+                            errorMessage.includes('User not found or inactive');
           
           if (isAuthError) {
             console.log('🔑 Auth token invalid, logging out');
@@ -154,7 +155,8 @@ class AuthService {
       if (error.response?.status === 401) {
         const errorMessage = error.response?.data?.message || '';
         const isAuthError = errorMessage.includes('Invalid or expired token') || 
-                          errorMessage.includes('Authentication failed');
+                          errorMessage.includes('Authentication failed') ||
+                          errorMessage.includes('User not found or inactive');
         
         if (isAuthError) {
           return { valid: false };

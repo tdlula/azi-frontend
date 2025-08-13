@@ -180,9 +180,47 @@ export default function DashboardMinimal() {
       if (chartType === 'line' || chartType === 'radar') {
         // These charts use the complex format: {labels: [], datasets: []}
         if (chart.data && chart.data.labels && chart.data.datasets) {
-          // Data is already in the correct format
+          // Data is already in the correct format - validate it's properly structured
           console.log('🔧 Line/radar chart data already in correct format');
-          normalizedChart.data = chart.data;
+          
+          // Ensure datasets have proper structure
+          const validatedDatasets = chart.data.datasets.map((dataset: any, idx: number) => {
+            if (!dataset.data || !Array.isArray(dataset.data)) {
+              console.warn(`🔧 Dataset ${idx} has invalid data, creating empty array`);
+              return { ...dataset, data: [] };
+            }
+            
+            // Ensure all data points are numbers
+            const validatedData = dataset.data.map((value: any, dataIdx: number) => {
+              const numValue = typeof value === 'number' ? value : 
+                             (typeof value === 'string' ? parseFloat(value) : 0);
+              if (isNaN(numValue)) {
+                console.warn(`🔧 Invalid data point at dataset ${idx}, index ${dataIdx}:`, value);
+                return 0;
+              }
+              return numValue;
+            });
+            
+            return {
+              ...dataset,
+              data: validatedData,
+              label: dataset.label || `Dataset ${idx + 1}`,
+              color: dataset.color || dataset.borderColor || '#3b82f6',
+              borderColor: dataset.borderColor || dataset.color || '#3b82f6',
+              backgroundColor: dataset.backgroundColor || `rgba(59, 130, 246, 0.1)`
+            };
+          });
+          
+          normalizedChart.data = {
+            labels: chart.data.labels,
+            datasets: validatedDatasets
+          };
+          
+          console.log('🔧 Line/radar chart validation complete:', {
+            labelsCount: chart.data.labels.length,
+            datasetsCount: validatedDatasets.length,
+            dataPoints: validatedDatasets.map(ds => ds.data.length)
+          });
         } else if (Array.isArray(chart.data)) {
           // Convert array format to line/radar format
           console.log('🔧 Converting array data to line/radar format');
@@ -196,9 +234,12 @@ export default function DashboardMinimal() {
                 const value = typeof item.value === 'object' && item.value !== null 
                   ? item.value.value 
                   : item.value;
-                return typeof value === 'number' ? value : 0;
+                const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+                return isNaN(numValue) ? 0 : numValue;
               }),
-              color: chart.data[0]?.color || '#3b82f6'
+              color: chart.data[0]?.color || '#3b82f6',
+              borderColor: chart.data[0]?.color || '#3b82f6',
+              backgroundColor: `rgba(59, 130, 246, 0.1)`
             }]
           };
         } else {
@@ -206,7 +247,13 @@ export default function DashboardMinimal() {
           console.warn('🔧 Line/radar chart has invalid data structure, creating empty dataset');
           normalizedChart.data = {
             labels: [],
-            datasets: []
+            datasets: [{
+              label: chart.title || 'No Data',
+              data: [],
+              color: '#6b7280',
+              borderColor: '#6b7280',
+              backgroundColor: 'rgba(107, 114, 128, 0.1)'
+            }]
           };
         }
       } else {
