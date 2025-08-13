@@ -4,7 +4,7 @@
  */
 
 // AI Response Definitions interface (matches the JSON structure)
-interface AIResponseDefinitions {
+export interface AIResponseDefinitions {
   markdownFormatting: {
     boldText: {
       syntax: string;

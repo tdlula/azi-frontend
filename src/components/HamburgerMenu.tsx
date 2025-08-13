@@ -174,15 +174,15 @@ export default function HamburgerMenu({
   return (
     <>
       {/* Hamburger Button */}
-      <div className="fixed top-20 left-4 z-50">
+      <div className="fixed top-16 sm:top-20 left-2 sm:left-4 z-50">
         <Button
           onClick={toggleMenu}
           variant="outline"
           size="icon"
           className={`
-            transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-md
+            transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-md touch-target
             bg-white/10 dark:bg-black/20 backdrop-blur-sm border-sky-blue/30 
-            hover:bg-sky-blue/20 hover:border-sky-blue/50
+            hover:bg-sky-blue/20 hover:border-sky-blue/50 w-10 h-10 sm:w-11 sm:h-11
             ${isOpen ? 'rotate-90 scale-110' : 'hover:rotate-12'}
           `}
         >
@@ -204,28 +204,28 @@ export default function HamburgerMenu({
 
       {/* Menu Panel */}
       <div className={`
-        fixed top-0 left-0 h-full w-80 z-50 transform transition-all duration-500 ease-out
+        fixed top-0 left-0 h-full w-72 sm:w-80 z-50 transform transition-all duration-500 ease-out
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'}
       `}>
         <Card className="h-full w-full bg-background/95 backdrop-blur-lg border-r border-border shadow-2xl">
-          <div className="p-6 h-full flex flex-col">
+          <div className="p-4 sm:p-6 h-full flex flex-col overflow-y-auto mobile-scroll">
             {/* Header - No duplicate close button */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-foreground">
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground">
                 Menu
               </h2>
             </div>
 
             {/* Navigation */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
                 Navigation
               </h3>
               <div className="space-y-2">
                 <RouterLink href="/dashboard">
                   <Button
                     variant={location === '/dashboard' ? "default" : "outline"}
-                    className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                    className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
                     onClick={() => setIsOpen(false)}
                   >
                     <Activity className="h-4 w-4 mr-2" />
@@ -235,7 +235,7 @@ export default function HamburgerMenu({
                 <RouterLink href="/chat">
                   <Button
                     variant={location === '/chat' ? "default" : "outline"}
-                    className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                    className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
                     onClick={() => setIsOpen(false)}
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />
@@ -245,17 +245,17 @@ export default function HamburgerMenu({
               </div>
             </div>
 
-            <Separator className="my-4 bg-border" />
+            <Separator className="my-3 sm:my-4 bg-border" />
 
             {/* Theme Toggle */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
                 Appearance
               </h3>
               <Button
                 onClick={toggleTheme}
                 variant="outline"
-                className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
               >
                 {theme === 'dark' ? (
                   <>
@@ -271,17 +271,17 @@ export default function HamburgerMenu({
               </Button>
             </div>
 
-            <Separator className="my-4 bg-border" />
+            <Separator className="my-3 sm:my-4 bg-border" />
 
             {/* Download & Export */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
                 Export & Download
               </h3>
               <div className="space-y-3">
                 <ExportDropdown
                   onExport={handleExportData}
-                  className="w-full"
+                  className="w-full touch-target text-sm"
                   variant="outline"
                   title="Export Data"
                 />
@@ -289,7 +289,7 @@ export default function HamburgerMenu({
                 <Button
                   onClick={handleScreenshot}
                   variant="outline"
-                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
                 >
                   <Camera className="h-4 w-4 mr-2 text-muted-foreground" />
                   Screenshot Page
@@ -297,7 +297,7 @@ export default function HamburgerMenu({
               </div>
             </div>
 
-            <Separator className="my-4 bg-border" />
+            <Separator className="my-3 sm:my-4 bg-border" />
 
             {/* Share Options */}
             <div className="mb-6">
@@ -320,7 +320,7 @@ export default function HamburgerMenu({
                 <Button
                   onClick={handleShareUrl}
                   variant="outline"
-                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
                 >
                   <Link className="h-4 w-4 mr-2 text-muted-foreground" />
                   Copy Page URL
@@ -329,7 +329,7 @@ export default function HamburgerMenu({
                 <Button
                   onClick={handleCopyContent}
                   variant="outline"
-                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md"
+                  className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
                 >
                   <Copy className="h-4 w-4 mr-2 text-muted-foreground" />
                   Copy Chat Content
@@ -338,7 +338,7 @@ export default function HamburgerMenu({
             </div>
 
             {/* Footer */}
-            <div className="mt-auto pt-6 border-t border-border">
+            <div className="mt-auto pt-4 sm:pt-6 border-t border-border">
               <p className="text-xs text-muted-foreground text-center">
                 AZI v2.0<br />
                 AI-Powered Analytics

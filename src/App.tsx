@@ -10,6 +10,8 @@ import SimpleChatFixed from "@/pages/simple-chat-fixed";
 import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
 import NotFound from "@/pages/not-found";
+import { useRoutePersistence } from "@/hooks/useRoutePersistence";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +22,47 @@ const queryClient = new QueryClient({
   },
 });
 
+function AppRoutes() {
+  const { restoreSavedRoute } = useRoutePersistence();
+
+  // Restore saved route on app initialization
+  useEffect(() => {
+    restoreSavedRoute();
+  }, []);
+
+  return (
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/">
+        <ProtectedRoute>
+          <DashboardMinimal />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard">
+        <ProtectedRoute>
+          <DashboardMinimal />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard-minimal">
+        <ProtectedRoute>
+          <DashboardMinimal />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chat">
+        <ProtectedRoute>
+          <SimpleChatFixed />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute>
+          <SettingsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="azi-ui-theme">
@@ -28,35 +71,7 @@ function App() {
           <AppProvider>
             <ErrorBoundary>
               <Router>
-                <Switch>
-                  <Route path="/login" component={LoginPage} />
-                  <Route path="/">
-                    <ProtectedRoute>
-                      <DashboardMinimal />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard">
-                    <ProtectedRoute>
-                      <DashboardMinimal />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard-minimal">
-                    <ProtectedRoute>
-                      <DashboardMinimal />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/chat">
-                    <ProtectedRoute>
-                      <SimpleChatFixed />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/settings">
-                    <ProtectedRoute>
-                      <SettingsPage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route component={NotFound} />
-                </Switch>
+                <AppRoutes />
               </Router>
             </ErrorBoundary>
           </AppProvider>

@@ -17,30 +17,47 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        {[1, 2, 3, 4].map((index) => (
-          <Card key={index} className="p-4 sm:p-6 animate-pulse">
-            <div className="w-32 h-4 bg-muted rounded mb-3 sm:mb-4" />
-            <div className="h-64 bg-muted/50 rounded" />
-          </Card>
-        ))}
+      <div className="space-y-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[1, 2, 3, 4].map((index) => (
+            <Card key={index} className="overflow-hidden bg-gradient-to-br from-card/50 to-card border border-border/50 shadow-lg">
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <div className="w-48 h-7 bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse" />
+                  <div className="h-1 w-16 bg-primary/50 rounded-full animate-pulse" />
+                </div>
+                <div className="bg-gradient-to-br from-background/80 to-muted/30 rounded-xl p-6 border border-border/30">
+                  <div className="h-80 bg-gradient-to-br from-muted/50 to-muted/30 rounded-lg animate-pulse" />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (!chartsData || Object.keys(chartsData).length === 0) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <Card className="p-4 sm:p-6">
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-              <p className="text-sm sm:text-base">
-                AI generating charts and insights...
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Analyzing data patterns and trends
-              </p>
+      <div className="space-y-8 mb-12">
+        <Card className="overflow-hidden bg-gradient-to-br from-card/50 to-card border border-border/50 shadow-lg">
+          <div className="p-8">
+            <div className="h-80 flex items-center justify-center text-muted-foreground">
+              <div className="text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 mx-auto bg-gradient-to-r from-primary/20 to-primary/40 rounded-full flex items-center justify-center animate-pulse">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold text-foreground">
+                    AI generating charts and insights...
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Analyzing data patterns and trends
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </Card>
@@ -150,7 +167,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
     });
   });
   
-  // Check for missing line chart and create fallback if needed
+  // Check if line chart exists in available charts
   const hasLineChart = availableCharts.some(chart => {
     const isLineChart = chart.chart.type === 'line' || 
                        chart.chart.chart_type === 'line' ||
@@ -192,58 +209,24 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
     
     return isLineChart && hasValidData;
   });
-  
-  if (!hasLineChart) {
-    console.warn('⚠️ Line chart missing or invalid, creating fallback');
-    // Generate more realistic time-based data for hourly sentiment
-    const currentHour = new Date().getHours();
-    const timeLabels = [];
-    const sentimentData = [];
-    
-    // Generate 12 hours of data starting from 6 hours ago
-    for (let i = -6; i < 6; i++) {
-      const hour = (currentHour + i + 24) % 24;
-      timeLabels.push(`${hour.toString().padStart(2, '0')}:00`);
-      // Generate realistic sentiment values between 70-95
-      sentimentData.push(Math.floor(Math.random() * 25) + 70);
-    }
-    
-    const fallbackLineChart = {
-      key: 'fallback_line',
-      chart: {
-        type: 'line',
-        title: 'Hourly Sentiment Trends (Fallback)',
-        data: {
-          labels: timeLabels,
-          datasets: [{
-            label: 'Positive Sentiment %',
-            data: sentimentData,
-            color: '#4CAF50',
-            borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            tension: 0.4
-          }]
-        },
-        metadata: {
-          topic: 'General Sentiment',
-          fallback: true,
-          generated: new Date().toISOString()
-        }
-      }
-    };
-    availableCharts.push(fallbackLineChart);
-    console.log('✅ Added enhanced fallback line chart with realistic data');
-  }
 
   if (availableCharts.length === 0) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <Card className="p-4 sm:p-6">
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-              <p className="text-sm sm:text-base">Processing AI insights...</p>
-              <p className="text-xs text-muted-foreground mt-1">Generating visualizations</p>
+      <div className="space-y-8 mb-12">
+        <Card className="overflow-hidden bg-gradient-to-br from-card/50 to-card border border-border/50 shadow-lg">
+          <div className="p-8">
+            <div className="h-80 flex items-center justify-center text-muted-foreground">
+              <div className="text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500/20 to-indigo-500/40 rounded-full flex items-center justify-center animate-pulse">
+                    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold text-foreground">Processing AI insights...</p>
+                  <p className="text-sm text-muted-foreground">Generating visualizations</p>
+                </div>
+              </div>
             </div>
           </div>
         </Card>
@@ -251,117 +234,213 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
     );
   }
 
-  // Determine optimal grid layout based on number of charts
+  // Simple, clean grid layout
   const getGridLayout = (count: number) => {
     if (count === 1) return "grid-cols-1";
     if (count === 2) return "grid-cols-1 lg:grid-cols-2";
-    if (count === 3) return "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3";
-    if (count === 4) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-2";
-    if (count === 5) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
-    if (count === 6) return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
-    if (count >= 7) return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
-    return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+    return "grid-cols-1 lg:grid-cols-2";
   };
 
   const gridLayout = getGridLayout(availableCharts.length);
 
   return (
-    <div className={`grid ${gridLayout} gap-4 sm:gap-6 mb-6 sm:mb-8`}>
-      {availableCharts.map(({ key, chart }) => {
-        try {
-          const normalizedChart = normalizeChartData(chart);
-          console.log(`🔧 Rendering chart ${key}:`, normalizedChart);
-          
-          return (
-            <Card key={key} className="p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{normalizedChart.title}</h3>
-              <div className="chart-container">
-                <ChartRenderer
-                  chartData={normalizedChart}
-                  onChartClick={(dataPoint, chartType, chartTitle) => {
-                    onChartClick(
-                      { ...dataPoint, chartType, chartTitle },
-                      chartType,
-                      chartTitle
-                    );
-                  }}
-                />
-              </div>
-              {normalizedChart.insights && (
-                <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    <span className="font-medium">AI Insight:</span> {normalizedChart.insights}
-                  </p>
-                </div>
-              )}
-              {/* Enhanced Metadata Display */}
-              {normalizedChart.metadata && (
-                <div className="mt-3 p-3 bg-muted/20 rounded-lg">
-                  <details className="group">
-                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                      📊 Chart Metadata
-                      <span className="ml-2 group-open:rotate-180 inline-block transition-transform">▼</span>
-                    </summary>
-                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      {normalizedChart.metadata.topic && (
-                        <div><span className="font-medium">Topic:</span> {normalizedChart.metadata.topic}</div>
-                      )}
-                      {normalizedChart.metadata.analysis_period && (
-                        <div>
-                          <span className="font-medium">Period:</span> {
-                            normalizedChart.metadata.analysis_period.start_datetime || normalizedChart.metadata.analysis_period.start_date
-                          } - {
-                            normalizedChart.metadata.analysis_period.end_datetime || normalizedChart.metadata.analysis_period.end_date
-                          }
-                        </div>
-                      )}
-                      {normalizedChart.metadata.total_entries_analyzed && (
-                        <div><span className="font-medium">Entries Analyzed:</span> {normalizedChart.metadata.total_entries_analyzed}</div>
-                      )}
-                      {normalizedChart.metadata.total_mentions_analyzed && (
-                        <div><span className="font-medium">Mentions Analyzed:</span> {normalizedChart.metadata.total_mentions_analyzed}</div>
-                      )}
-                      {normalizedChart.metadata.score_scale && (
-                        <div><span className="font-medium">Score Scale:</span> {normalizedChart.metadata.score_scale}</div>
-                      )}
-                      {normalizedChart.metadata.source_count && (
-                        <div>
-                          <span className="font-medium">Sources:</span> 
-                          Call-ins: {normalizedChart.metadata.source_count.call_ins}, 
-                          WhatsApp: {normalizedChart.metadata.source_count.whatsapp_feedback}, 
-                          Presenter: {normalizedChart.metadata.source_count.presenter_segments}
-                        </div>
-                      )}
-                      {normalizedChart.metadata.scoring_criteria && (
-                        <div><span className="font-medium">Criteria:</span> {normalizedChart.metadata.scoring_criteria.join(', ')}</div>
-                      )}
-                      {normalizedChart.metadata.metrics_included && (
-                        <div><span className="font-medium">Metrics:</span> {normalizedChart.metadata.metrics_included.join(', ')}</div>
-                      )}
-                      {normalizedChart.metadata.smoothing_method && (
-                        <div><span className="font-medium">Smoothing:</span> {normalizedChart.metadata.smoothing_method}</div>
-                      )}
+    <div className="space-y-8 mb-12">
+      <div className={`grid ${gridLayout} gap-8`}>
+        {availableCharts.map(({ key, chart }) => {
+          try {
+            const normalizedChart = normalizeChartData(chart);
+            console.log(`🔧 Rendering chart ${key}:`, normalizedChart);
+            
+            return (
+              <Card key={key} className="group relative overflow-hidden bg-gradient-to-br from-card/50 to-card border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-primary/20">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                <div className="relative p-8 space-y-6">
+                  {/* Enhanced Title Section */}
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
+                      {normalizedChart.title}
+                    </h3>
+                    <div className="h-1 w-16 bg-gradient-to-r from-primary to-primary/60 rounded-full" />
+                  </div>
+                  
+                  {/* Chart Container with Professional Styling */}
+                  <div className="relative">
+                    <div className="bg-gradient-to-br from-background/80 to-muted/30 rounded-xl p-6 border border-border/30 shadow-inner">
+                      <div className="h-80 w-full">
+                        <ChartRenderer
+                          chartData={normalizedChart}
+                          onChartClick={(dataPoint, chartType, chartTitle) => {
+                            onChartClick(
+                              { ...dataPoint, chartType, chartTitle },
+                              chartType,
+                              chartTitle
+                            );
+                          }}
+                        />
+                      </div>
                     </div>
-                  </details>
+                  </div>
+                  
+                  {/* AI Insights with Better Styling */}
+                  {normalizedChart.insights && (
+                    <div className="relative">
+                      <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-200/50 dark:border-blue-800/30 rounded-xl p-5">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+                              <span className="text-white text-sm font-bold">AI</span>
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                              💡 AI Insight
+                            </h4>
+                            <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                              {normalizedChart.insights}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Enhanced Metadata Display */}
+                  {normalizedChart.metadata && (
+                    <div className="relative">
+                      <div className="bg-gradient-to-r from-slate-50/80 to-gray-50/80 dark:from-slate-900/20 dark:to-gray-900/20 border border-slate-200/50 dark:border-slate-700/30 rounded-xl p-5">
+                        <details className="group/details">
+                          <summary className="cursor-pointer select-none">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-6 h-6 bg-gradient-to-r from-slate-500 to-gray-500 rounded-md flex items-center justify-center">
+                                  <span className="text-white text-xs">📊</span>
+                                </div>
+                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Chart Metadata
+                                </span>
+                              </div>
+                              <span className="text-slate-400 group-open/details:rotate-180 transition-transform duration-200">
+                                ▼
+                              </span>
+                            </div>
+                          </summary>
+                          
+                          <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/30">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                              {normalizedChart.metadata.topic && (
+                                <div className="space-y-1">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Topic:</span>
+                                  <p className="text-slate-800 dark:text-slate-200">{normalizedChart.metadata.topic}</p>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.analysis_period && (
+                                <div className="space-y-1">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Period:</span>
+                                  <p className="text-slate-800 dark:text-slate-200 text-xs">
+                                    {normalizedChart.metadata.analysis_period.start_datetime || normalizedChart.metadata.analysis_period.start_date} - {normalizedChart.metadata.analysis_period.end_datetime || normalizedChart.metadata.analysis_period.end_date}
+                                  </p>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.total_entries_analyzed && (
+                                <div className="space-y-1">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Entries Analyzed:</span>
+                                  <p className="text-slate-800 dark:text-slate-200 font-mono">{normalizedChart.metadata.total_entries_analyzed}</p>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.total_mentions_analyzed && (
+                                <div className="space-y-1">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Mentions Analyzed:</span>
+                                  <p className="text-slate-800 dark:text-slate-200 font-mono">{normalizedChart.metadata.total_mentions_analyzed}</p>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.score_scale && (
+                                <div className="space-y-1 sm:col-span-2">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Score Scale:</span>
+                                  <p className="text-slate-800 dark:text-slate-200">{normalizedChart.metadata.score_scale}</p>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.source_count && (
+                                <div className="space-y-1 sm:col-span-2">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Sources:</span>
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium">
+                                      Call-ins: {normalizedChart.metadata.source_count.call_ins}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-xs font-medium">
+                                      WhatsApp: {normalizedChart.metadata.source_count.whatsapp_feedback}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 text-xs font-medium">
+                                      Presenter: {normalizedChart.metadata.source_count.presenter_segments}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.scoring_criteria && (
+                                <div className="space-y-1 sm:col-span-2">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Criteria:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {normalizedChart.metadata.scoring_criteria.map((criteria: string, idx: number) => (
+                                      <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-xs">
+                                        {criteria}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.metrics_included && (
+                                <div className="space-y-1 sm:col-span-2">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Metrics:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {normalizedChart.metadata.metrics_included.map((metric: string, idx: number) => (
+                                      <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 text-xs">
+                                        {metric}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {normalizedChart.metadata.smoothing_method && (
+                                <div className="space-y-1">
+                                  <span className="font-medium text-slate-600 dark:text-slate-400">Smoothing:</span>
+                                  <p className="text-slate-800 dark:text-slate-200">{normalizedChart.metadata.smoothing_method}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </Card>
-          );
-        } catch (error) {
-          console.error(`🔧 Error rendering chart ${key}:`, error, 'Chart data:', chart);
-          return (
-            <Card key={key} className="p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">{chart?.title || 'Chart Error'}</h3>
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm">Error rendering chart</p>
-                  <p className="text-xs text-destructive mt-1">Check console for details</p>
+              </Card>
+            );
+          } catch (error) {
+            console.error(`🔧 Error rendering chart ${key}:`, error, 'Chart data:', chart);
+            return (
+              <Card key={key} className="p-8 bg-card border border-destructive/20 shadow-lg">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold text-foreground">{chart?.title || 'Chart Error'}</h3>
+                    <div className="h-1 w-16 bg-destructive rounded-full" />
+                  </div>
+                  <div className="h-80 flex items-center justify-center text-muted-foreground bg-destructive/5 rounded-xl border border-destructive/20">
+                    <div className="text-center space-y-3">
+                      <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">⚠️</span>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-destructive">Error rendering chart</p>
+                        <p className="text-sm text-muted-foreground mt-1">Check console for details</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          );
-        }
-      })}
+              </Card>
+            );
+          }
+        })}
+      </div>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { 
@@ -36,7 +37,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Settings,
-  Trash2
+  Trash2,
+  Square,
+  MessageSquareText
 } from "lucide-react";
 import ChartRenderer from "@/components/charts/ChartRenderer";
 import SentimentTable from "@/components/SentimentTable";
@@ -59,7 +62,8 @@ import {
   formatTextWithAIDefinitions, 
   renderFormattedLineWithDefinitions,
   enhanceAIResponse,
-  applyContextualFormatting 
+  applyContextualFormatting,
+  AIResponseDefinitions
 } from "@/utils/aiResponseFormatter";
 
 // Generate unique IDs for messages to prevent React key warnings
@@ -76,6 +80,8 @@ interface Message {
   chartData?: any;
   sentimentData?: any;
   tableData?: any;
+  isStreaming?: boolean;
+  fullContent?: string;
 }
 
 interface Suggestion {
@@ -211,45 +217,161 @@ export default function SimpleChatFixedPage() {
   const [isLoadingEnhancedData, setIsLoadingEnhancedData] = useState(false);
   
   // AI Response Definitions state
-  const [aiResponseDefinitions, setAIResponseDefinitions] = useState(null);
+  const [aiResponseDefinitions, setAIResponseDefinitions] = useState<AIResponseDefinitions | null>(null);
   const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
+  
+  // Quick reply suggestions state
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [lastAssistantMessageId, setLastAssistantMessageId] = useState<number | null>(null);
+
+  // Streaming text state
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
+  const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Custom hook for streaming text effect
+  const useStreamingText = (targetText: string, messageId: number, isEnabled: boolean) => {
+    const [displayText, setDisplayText] = useState('');
+    const [isComplete, setIsComplete] = useState(false);
+
+    useEffect(() => {
+      if (!isEnabled || !targetText || messageId !== streamingMessageId) {
+        setDisplayText(targetText);
+        setIsComplete(true);
+        return;
+      }
+
+      setDisplayText('');
+      setIsComplete(false);
+      let currentIndex = 0;
+
+      // Clear any existing streaming interval
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+      }
+
+      const streamInterval = setInterval(() => {
+        if (currentIndex <= targetText.length) {
+          setDisplayText(targetText.slice(0, currentIndex));
+          currentIndex++;
+        } else {
+          setIsComplete(true);
+          setStreamingMessageId(null);
+          clearInterval(streamInterval);
+          streamingIntervalRef.current = null;
+        }
+      }, 30); // Adjust speed here (30ms = ~33 words per second for average word length)
+
+      streamingIntervalRef.current = streamInterval;
+
+      return () => {
+        if (streamInterval) {
+          clearInterval(streamInterval);
+        }
+      };
+    }, [targetText, messageId, isEnabled, streamingMessageId]);
+
+    return { displayText, isComplete };
+  };
+
+  // Quick reply suggestions options
+  const quickReplySuggestions = [
+    { text: "Summarize this", icon: "📄" },
+    { text: "Give more detail", icon: "🔍" },
+    { text: "Explain simply", icon: "💡" },
+    { text: "Show me a chart", icon: "📊" },
+    { text: "What's the key insight?", icon: "🎯" },
+    { text: "Compare with competitors", icon: "⚡" },
+    { text: "Show trends over time", icon: "📈" },
+    { text: "Break this down", icon: "🧩" }
+  ];
+
+  // Handle quick reply selection
+  const handleQuickReply = (suggestion: string) => {
+    setInput(suggestion);
+    setShowQuickReplies(false);
+    // Auto-focus textarea after selecting suggestion
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      autoResizeTextarea();
+    }
+  };
 
   // Enhanced function to format text according to AI response definitions (moved inside component)
   const formatTextWithDefinitions = (text: string, definitions: any = null) => {
+    if (!text) return '';
+    
     let formattedText = text;
     
-    // Handle bold text (**text**)
+    // Handle URLs first (before other formatting)
+    formattedText = formattedText.replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">$1</a>'
+    );
+    
+    // Handle email addresses
+    formattedText = formattedText.replace(
+      /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
+      '<a href="mailto:$1" class="text-blue-400 hover:text-blue-300 underline">$1</a>'
+    );
+
+    // Handle markdown headers BEFORE converting newlines (must be processed before bold text)
+    formattedText = formattedText.replace(/^######\s+(.+)$/gm, '<h6 class="text-sm font-semibold text-yellow-300 mt-3 mb-2">$1</h6>');
+    formattedText = formattedText.replace(/^#####\s+(.+)$/gm, '<h5 class="text-base font-semibold text-yellow-300 mt-3 mb-2">$1</h5>');
+    formattedText = formattedText.replace(/^####\s+(.+)$/gm, '<h4 class="text-lg font-semibold text-yellow-300 mt-4 mb-2">$1</h4>');
+    formattedText = formattedText.replace(/^###\s+(.+)$/gm, '<h3 class="text-xl font-bold text-yellow-300 mt-4 mb-3">$1</h3>');
+    formattedText = formattedText.replace(/^##\s+(.+)$/gm, '<h2 class="text-2xl font-bold text-yellow-300 mt-5 mb-3">$1</h2>');
+    formattedText = formattedText.replace(/^#\s+(.+)$/gm, '<h1 class="text-3xl font-bold text-yellow-300 mt-6 mb-4">$1</h1>');
+
+    // Handle line breaks AFTER header processing
+    formattedText = formattedText.replace(/\n/g, '<br>');
+
+    // Handle markdown - Bold text **text**
     formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-yellow-300">$1</strong>');
     
-    // Handle source citations 【message idx:search idx†Radio Station Name】
-    formattedText = formattedText.replace(/【([^】]+)】/g, '<span class="inline-block bg-blue-600/20 text-blue-300 px-2 py-1 rounded text-xs font-mono border border-blue-500/30 ml-1" title="Source Citation">$1</span>');
+    // Handle markdown - Italic text *text*
+    formattedText = formattedText.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic text-gray-300">$1</em>');
+    
+    // Handle markdown - Code `code`
+    formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-slate-700 text-orange-300 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+    
+    // Handle strikethrough ~~text~~
+    formattedText = formattedText.replace(/~~(.*?)~~/g, '<del class="line-through text-gray-400">$1</del>');
+    
+    // Handle percentages
+    formattedText = formattedText.replace(/(\d+(?:\.\d+)?%)/g, '<span class="font-semibold text-green-400">$1</span>');
     
     // Handle currency (R##.##)
-    formattedText = formattedText.replace(/\bR(\d+(?:\.\d{2})?)\b/g, '<span class="font-semibold text-green-400" title="South African Rands">R$1</span>');
-    
-    // Handle quoted content ("text")
-    formattedText = formattedText.replace(/"([^"]+)"/g, '<span class="italic text-gray-300 border-l-2 border-gray-500 pl-2" title="Quoted Content">"$1"</span>');
-    
-    // Handle abbreviations with clarifications - pattern: Full Name (Abbreviation)
-    formattedText = formattedText.replace(/\b([A-Z][A-Za-z\s]+)\s*\(([A-Z]{2,})\)/g, '<span class="text-blue-300">$1</span> (<span class="font-semibold text-blue-400" title="Abbreviation">$2</span>)');
-    
-    // Handle program and station identification - "Program Name on Station Name"
-    formattedText = formattedText.replace(/\b([A-Z][A-Za-z\s]+)\s+on\s+([A-Z][A-Za-z\s]+)\b/g, '<span class="text-purple-300 font-medium" title="Program">$1</span> on <span class="text-purple-400 font-semibold" title="Radio Station">$2</span>');
-    
-    // Handle clarification formatting for technical terms
-    formattedText = formattedText.replace(/\b([A-Z]{2,})\s*\(([^)]+)\)/g, '<span class="font-semibold text-cyan-400" title="$2">$1</span> <span class="text-sm text-gray-400">($2)</span>');
+    formattedText = formattedText.replace(/\bR(\d+(?:\.\d{2})?)\b/g, '<span class="font-semibold text-green-400">R$1</span>');
     
     return formattedText;
   };
 
   // Enhanced function to render a single line with formatting (moved inside component)
-  const renderFormattedLine = (line: string, index: number, definitions: any = null) => {
+  const renderFormattedLine = (line: string, index: number, definitions: AIResponseDefinitions | null = null) => {
     const trimmedLine = line.trim();
     
     // Empty line
     if (trimmedLine === '') return <br key={index} />;
     
-    // Header (## Header Text)
+    // Headers (# Header, ## Header, ### Header, #### Header)
+    if (trimmedLine.startsWith('#### ')) {
+      const headerText = trimmedLine.slice(5);
+      return (
+        <h5 key={index} className="text-sm font-semibold text-white mb-2 mt-2 border-b border-gray-800 pb-1">
+          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(headerText, definitions) }} />
+        </h5>
+      );
+    }
+    
+    if (trimmedLine.startsWith('### ')) {
+      const headerText = trimmedLine.slice(4);
+      return (
+        <h4 key={index} className="text-base font-bold text-white mb-2 mt-3 border-b border-gray-700 pb-1">
+          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(headerText, definitions) }} />
+        </h4>
+      );
+    }
+    
     if (trimmedLine.startsWith('## ')) {
       const headerText = trimmedLine.slice(3);
       return (
@@ -259,7 +381,6 @@ export default function SimpleChatFixedPage() {
       );
     }
     
-    // Single # headers
     if (trimmedLine.startsWith('# ')) {
       const headerText = trimmedLine.slice(2);
       return (
@@ -269,13 +390,23 @@ export default function SimpleChatFixedPage() {
       );
     }
     
-    // Bullet points (- item or * item)
-    if (trimmedLine.match(/^[-*]\s+/)) {
-      const bulletText = trimmedLine.replace(/^[-*]\s+/, '');
+    // Code blocks (```code```)
+    if (trimmedLine.startsWith('```') && trimmedLine.endsWith('```') && trimmedLine.length > 6) {
+      const codeText = trimmedLine.slice(3, -3);
+      return (
+        <pre key={index} className="bg-slate-800 border border-slate-600 rounded-lg p-3 my-3 overflow-x-auto">
+          <code className="text-orange-300 text-sm font-mono">{codeText}</code>
+        </pre>
+      );
+    }
+    
+    // Bullet points (- item, * item, + item)
+    if (trimmedLine.match(/^[-*+]\s+/)) {
+      const bulletText = trimmedLine.replace(/^[-*+]\s+/, '');
       return (
         <div key={index} className="flex items-start mb-2">
-          <span className="text-yellow-400 mr-3 mt-1">•</span>
-          <span className="text-white leading-relaxed" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(bulletText, definitions) }} />
+          <span className="text-yellow-400 mr-3 mt-1 flex-shrink-0">•</span>
+          <span className="text-white leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(bulletText, definitions) }} />
         </div>
       );
     }
@@ -287,21 +418,46 @@ export default function SimpleChatFixedPage() {
         const [, number, text] = match;
         return (
           <div key={index} className="flex items-start mb-2">
-            <span className="text-blue-400 font-semibold mr-3 mt-1 min-w-[20px]">{number}.</span>
-            <span className="text-white leading-relaxed" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(text, definitions) }} />
+            <span className="text-blue-400 font-semibold mr-3 mt-1 min-w-[24px] flex-shrink-0">{number}.</span>
+            <span className="text-white leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(text, definitions) }} />
           </div>
         );
       }
+    }
+    
+    // Task lists (- [ ] item, - [x] item)
+    if (trimmedLine.match(/^[-*+]\s+\[[x\s]\]\s+/i)) {
+      const isChecked = trimmedLine.match(/^[-*+]\s+\[x\]\s+/i);
+      const taskText = trimmedLine.replace(/^[-*+]\s+\[[x\s]\]\s+/i, '');
+      return (
+        <div key={index} className="flex items-start mb-2">
+          <span className={`mr-3 mt-1 flex-shrink-0 ${isChecked ? 'text-green-400' : 'text-gray-400'}`}>
+            {isChecked ? '☑' : '☐'}
+          </span>
+          <span className={`leading-relaxed flex-1 ${isChecked ? 'line-through text-gray-400' : 'text-white'}`} 
+                dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(taskText, definitions) }} />
+        </div>
+      );
+    }
+    
+    // Horizontal rule (--- or ***)
+    if (trimmedLine.match(/^(---+|\*\*\*+)$/)) {
+      return <hr key={index} className="border-gray-600 my-4" />;
     }
     
     // Blockquotes (> text)
     if (trimmedLine.startsWith('> ')) {
       const quoteText = trimmedLine.slice(2);
       return (
-        <blockquote key={index} className="border-l-4 border-gray-500 pl-4 py-2 my-3 bg-gray-800/30 italic text-gray-300">
-          <span dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(quoteText, definitions) }} />
+        <blockquote key={index} className="border-l-4 border-blue-500 pl-4 py-2 my-3 bg-blue-900/20 rounded-r">
+          <span className="text-gray-200 italic" dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(quoteText, definitions) }} />
         </blockquote>
       );
+    }
+    
+    // Table separator line (|---|---|)
+    if (trimmedLine.match(/^\|?[\s]*:?-+:?[\s]*(\|[\s]*:?-+:?[\s]*)*\|?$/)) {
+      return null; // Skip table separator lines, they're handled by table detection
     }
     
     // Regular paragraph
@@ -361,17 +517,19 @@ export default function SimpleChatFixedPage() {
           <div>
             {beforeTable && (
               <div className="prose prose-sm max-w-none mb-4 text-white">
-                {beforeTable.split('\n').map((line: string, index: number) => 
-                  renderFormattedLine(line, index, aiResponseDefinitions)
-                )}
+                <div 
+                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(beforeTable, aiResponseDefinitions) }}
+                  className="leading-relaxed text-white"
+                />
               </div>
             )}
             <DataTable data={tableData} title={tableData.title} />
             {afterTable && (
               <div className="prose prose-sm max-w-none mt-4 text-white">
-                {afterTable.split('\n').map((line: string, index: number) => 
-                  renderFormattedLine(line, index, aiResponseDefinitions)
-                )}
+                <div 
+                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(afterTable, aiResponseDefinitions) }}
+                  className="leading-relaxed text-white"
+                />
               </div>
             )}
           </div>
@@ -384,6 +542,105 @@ export default function SimpleChatFixedPage() {
       <div className="prose prose-sm max-w-none text-white">
         {lines.map((line: string, index: number) => 
           renderFormattedLine(line, index, aiResponseDefinitions)
+        )}
+      </div>
+    );
+  };
+
+  // Streaming message content component
+  const StreamingMessageContent = ({ message }: { message: Message }) => {
+    const fullContent = message.fullContent || message.content;
+    const shouldStream = message.role === 'assistant' && !!message.isStreaming && message.id === streamingMessageId;
+    const { displayText, isComplete } = useStreamingText(fullContent, message.id, shouldStream);
+    
+    const contentToRender = shouldStream ? displayText : fullContent;
+    
+    // Ensure we always have content to render
+    if (!contentToRender) {
+      return <div>Loading...</div>;
+    }
+    
+    // Check for potential table content with more nuanced detection
+    // Apply formatting to the entire content first, then split for table detection
+    const formattedContent = formatTextWithDefinitions(contentToRender, aiResponseDefinitions);
+    const lines = contentToRender.split('\n');
+    const pipeLines = lines.filter(line => line.includes('|'));
+    const commaLines = lines.filter(line => line.includes(','));
+    const tabLines = lines.filter(line => line.includes('\t'));
+    
+    const mightContainTable = (
+      // Markdown table: multiple lines with pipes, at least 3 lines (header + separator + data)
+      (pipeLines.length >= 3 && pipeLines.some(line => line.split('|').length >= 4)) ||
+      // CSV: multiple lines with commas, consistent structure
+      (commaLines.length >= 3 && commaLines.some(line => line.split(',').length >= 3)) ||
+      // TSV: multiple lines with tabs
+      (tabLines.length >= 3 && tabLines.some(line => line.split('\t').length >= 3))
+    ) && (
+      // Exclude clearly conversational content
+      !contentToRender.toLowerCase().match(/^(here are|the results|i found|let me|i'll|i can|based on)/i) &&
+      contentToRender.length > 50 // Reasonable minimum length
+    );
+
+    // Only attempt table detection if content seems table-like and streaming is complete
+    if (mightContainTable && (isComplete || !shouldStream)) {
+      const tableData = detectMultipleTableFormats(contentToRender);
+      
+      if (tableData) {
+        // Extract non-table content (content before and after table)
+        const lines = contentToRender.split('\n');
+        let tableStartIndex = -1;
+        let tableEndIndex = -1;
+        
+        // Find table boundaries in the content
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.includes('|') && line.split('|').length >= 3) {
+            if (tableStartIndex === -1) {
+              tableStartIndex = i;
+            }
+            tableEndIndex = i;
+          }
+        }
+        
+        const beforeTable = tableStartIndex > 0 ? lines.slice(0, tableStartIndex).join('\n').trim() : '';
+        const afterTable = tableEndIndex < lines.length - 1 ? lines.slice(tableEndIndex + 1).join('\n').trim() : '';
+        
+        return (
+          <div>
+            {beforeTable && (
+              <div className="prose prose-sm max-w-none mb-4 text-white">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(beforeTable, aiResponseDefinitions) }}
+                  className="leading-relaxed text-white"
+                />
+              </div>
+            )}
+            <DataTable data={tableData} title={tableData.title} />
+            {afterTable && (
+              <div className="prose prose-sm max-w-none mt-4 text-white">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(afterTable, aiResponseDefinitions) }}
+                  className="leading-relaxed text-white"
+                />
+              </div>
+            )}
+            {shouldStream && !isComplete && (
+              <span className="inline-block w-2 h-5 bg-white ml-1 animate-pulse"></span>
+            )}
+          </div>
+        );
+      }
+    }
+    
+    // No table detected or content doesn't look table-like, render with enhanced formatting
+    return (
+      <div className="prose prose-sm max-w-none text-white">
+        <div 
+          dangerouslySetInnerHTML={{ __html: formattedContent }}
+          className="leading-relaxed text-white"
+        />
+        {shouldStream && !isComplete && (
+          <span className="inline-block w-2 h-5 bg-white ml-1 animate-pulse"></span>
         )}
       </div>
     );
@@ -409,9 +666,146 @@ export default function SimpleChatFixedPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   // Restore sidebarRef for sidebar DOM access
   const sidebarRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Auto-resize textarea function
+  const autoResizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Store the current scroll position
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      
+      // Calculate new height (min 44px for touch targets, max 120px)
+      const minHeight = 44;
+      const maxHeight = 120;
+      const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight));
+      
+      // Set the new height
+      textarea.style.height = newHeight + 'px';
+      
+      // Restore scroll position to prevent jumping
+      window.scrollTo(0, scrollTop);
+    }
+  };
+
+  // Handle textarea input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    autoResizeTextarea();
+    
+    // Hide quick replies when user starts typing
+    if (e.target.value.length > 0 && showQuickReplies) {
+      setShowQuickReplies(false);
+    }
+  };
+
+  // Handle keyboard shortcuts in textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey || e.ctrlKey) {
+        // Shift+Enter or Ctrl+Enter: Allow new line
+        return;
+      } else {
+        // Enter: Submit the form
+        e.preventDefault();
+        if (input.trim() && !isLoading && !isUploadProcessing) {
+          handleSubmit(e as any);
+        }
+      }
+    } else if (e.key === 'Escape' && isLoading) {
+      // Escape: Stop generation if currently loading
+      e.preventDefault();
+      stopGeneration();
+    }
+  };
+
+  // Stop/Cancel current AI response
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Stop streaming effect
+    if (streamingIntervalRef.current) {
+      clearInterval(streamingIntervalRef.current);
+      streamingIntervalRef.current = null;
+    }
+    setStreamingMessageId(null);
+    
+    dispatch({ type: 'SET_LOADING', payload: false });
+    
+    // Add a system message indicating the response was stopped
+    const stopMessage: Message = {
+      id: generateUniqueId(),
+      content: "🛑 Response generation was stopped by user.",
+      role: "assistant",
+      timestamp: new Date(),
+      isStreaming: false,
+      fullContent: "🛑 Response generation was stopped by user.",
+    };
+    dispatch({ type: 'ADD_MESSAGE', payload: stopMessage });
+  };
+
+  // Auto-resize textarea when input changes
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [input]);
+
+  // Focus textarea when component mounts and after sending a message
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      autoResizeTextarea(); // Ensure proper initial sizing
+    }
+  }, [messages.length]); // Focus after new message is added
+
+  // Initial textarea setup
+  useEffect(() => {
+    if (textareaRef.current) {
+      autoResizeTextarea();
+    }
+  }, []); // Run once on mount
+
+  // Cleanup abort controller and streaming interval on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Show quick replies after assistant messages - DISABLED AUTO-OPEN
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant' && !isLoading) {
+      setLastAssistantMessageId(lastMessage.id);
+      // Quick replies no longer auto-open - user must click the button
+      // setShowQuickReplies(true);
+      
+      // Auto-hide quick replies if they were manually opened and a new message arrives
+      if (showQuickReplies) {
+        const timeout = setTimeout(() => {
+          setShowQuickReplies(false);
+        }, 30000);
+        
+        return () => clearTimeout(timeout);
+      }
+    } else {
+      setShowQuickReplies(false);
+    }
+  }, [messages, isLoading, showQuickReplies]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -434,6 +828,21 @@ export default function SimpleChatFixedPage() {
     
     // Optionally clear input if there's any
     setInput("");
+    
+    // Hide quick replies when starting new conversation
+    setShowQuickReplies(false);
+    
+    // Reset streaming state
+    if (streamingIntervalRef.current) {
+      clearInterval(streamingIntervalRef.current);
+      streamingIntervalRef.current = null;
+    }
+    setStreamingMessageId(null);
+    
+    // Reset textarea height when starting new conversation
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     
     console.log('Started new conversation with ID:', newConversationId);
   };
@@ -554,6 +963,15 @@ export default function SimpleChatFixedPage() {
 
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
     setInput("");
+    
+    // Hide quick replies when user sends a message
+    setShowQuickReplies(false);
+    
+    // Reset textarea height after sending message
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+    
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
@@ -637,14 +1055,20 @@ export default function SimpleChatFixedPage() {
             allKeys: Object.keys(chartData)
           });
           
+          const messageId = generateUniqueId();
           const aiMessage: Message = {
-            id: generateUniqueId(),
-            content: chartData.message || "Here's your requested chart:",
+            id: messageId,
+            content: "",
             role: "assistant",
             timestamp: new Date(),
             chartData: chartData,
+            isStreaming: true,
+            fullContent: chartData.message || "Here's your requested chart:",
           };
           dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          
+          // Start streaming effect
+          setStreamingMessageId(messageId);
           return;
         } else {
           console.error('[Chart Generation] Chart API request failed:', chartResponse.status, chartResponse.statusText);
@@ -678,28 +1102,41 @@ export default function SimpleChatFixedPage() {
             text: input,
             format: format 
           }),
+          signal: abortControllerRef.current?.signal
         });
 
         if (sentimentResponse.ok) {
           const sentimentData = await sentimentResponse.json();
           
           if (format === "table") {
+            const messageId = generateUniqueId();
             const aiMessage: Message = {
-              id: generateUniqueId(),
-              content: sentimentData.analysis || "Here's your sentiment analysis:",
+              id: messageId,
+              content: "",
               role: "assistant",
               timestamp: new Date(),
               sentimentData: sentimentData.table || sentimentData,
+              isStreaming: true,
+              fullContent: sentimentData.analysis || "Here's your sentiment analysis:",
             };
             dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+            
+            // Start streaming effect
+            setStreamingMessageId(messageId);
           } else {
+            const messageId = generateUniqueId();
             const aiMessage: Message = {
-              id: generateUniqueId(),
-              content: sentimentData.analysis || sentimentData.summary || "Analysis complete.",
+              id: messageId,
+              content: "",
               role: "assistant",
               timestamp: new Date(),
+              isStreaming: true,
+              fullContent: sentimentData.analysis || sentimentData.summary || "Analysis complete.",
             };
             dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+            
+            // Start streaming effect
+            setStreamingMessageId(messageId);
           }
           return;
         }
@@ -710,6 +1147,9 @@ export default function SimpleChatFixedPage() {
         role: msg.role,
         content: msg.content
       }));
+
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
 
       // Regular chat API call with conversation history
       const response = await fetch("/api/chat-response", {
@@ -722,6 +1162,7 @@ export default function SimpleChatFixedPage() {
           conversationHistory: conversationHistory,
           conversationId: conversationId
         }),
+        signal: abortControllerRef.current.signal
       });
 
       if (response.ok) {
@@ -729,14 +1170,20 @@ export default function SimpleChatFixedPage() {
         
         // Check if the response contains chart data
         if (data.chartData) {
+          const messageId = generateUniqueId();
           const aiMessage: Message = {
-            id: generateUniqueId(),
-            content: data.message || "Here's a visualization based on your request:",
+            id: messageId,
+            content: "",
             role: "assistant",
             timestamp: new Date(),
             chartData: data.chartData,
+            isStreaming: true,
+            fullContent: data.message || "Here's a visualization based on your request:",
           };
           dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          
+          // Start streaming effect
+          setStreamingMessageId(messageId);
         } else {
           const responseContent = data.message || data.response || "I'm here to help with your data analysis needs.";
           
@@ -745,24 +1192,36 @@ export default function SimpleChatFixedPage() {
           
           if (extractedChartData) {
             console.log('[Chat] Detected chart data in AI response:', extractedChartData.title);
-            // Response contains chart data - create message with chart
+            // Response contains chart data - create message with chart and streaming
+            const messageId = generateUniqueId();
             const aiMessage: Message = {
-              id: generateUniqueId(),
-              content: responseContent,
+              id: messageId,
+              content: "",
               role: "assistant",
               timestamp: new Date(),
               chartData: extractedChartData,
+              isStreaming: true,
+              fullContent: responseContent,
             };
             dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+            
+            // Start streaming effect
+            setStreamingMessageId(messageId);
           } else {
-            // Regular text response
+            // Regular text response with streaming effect
+            const messageId = generateUniqueId();
             const aiMessage: Message = {
-              id: generateUniqueId(),
-              content: responseContent,
+              id: messageId,
+              content: "",
               role: "assistant",
               timestamp: new Date(),
+              isStreaming: true,
+              fullContent: responseContent,
             };
             dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+            
+            // Start streaming effect
+            setStreamingMessageId(messageId);
           }
         }
       } else {
@@ -770,6 +1229,14 @@ export default function SimpleChatFixedPage() {
       }
     } catch (error) {
       console.error('Chat error:', error);
+      
+      // Handle AbortError (user cancelled request)
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Don't add an error message for user-cancelled requests
+        // The stopGeneration function already adds a message
+        return;
+      }
+      
       let errorContent = "I encountered an error while processing your request. Please try again.";
       
       if (error instanceof Error) {
@@ -789,10 +1256,13 @@ export default function SimpleChatFixedPage() {
         content: errorContent,
         role: "assistant",
         timestamp: new Date(),
+        isStreaming: false,
+        fullContent: errorContent,
       };
       dispatch({ type: 'ADD_MESSAGE', payload: errorMessage });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
+      abortControllerRef.current = null; // Clean up the abort controller
     }
   };
 
@@ -813,6 +1283,8 @@ export default function SimpleChatFixedPage() {
         content: `File is too large. Please upload a ${isPDF ? 'PDF' : 'text'} file smaller than ${isPDF ? '50MB' : '10MB'}.`,
         role: "assistant",
         timestamp: new Date(),
+        isStreaming: false,
+        fullContent: `File is too large. Please upload a ${isPDF ? 'PDF' : 'text'} file smaller than ${isPDF ? '50MB' : '10MB'}.`,
       };
       dispatch({ type: 'ADD_MESSAGE', payload: errorMessage });
       return;
@@ -826,6 +1298,8 @@ export default function SimpleChatFixedPage() {
       content: `Analyzing ${fileName}...`,
       role: "assistant", 
       timestamp: new Date(),
+      isStreaming: false,
+      fullContent: `Analyzing ${fileName}...`,
     };
     dispatch({ type: 'ADD_MESSAGE', payload: uploadMessage });
 
@@ -847,6 +1321,8 @@ export default function SimpleChatFixedPage() {
           content: isPDF ? "PDF processed successfully! Analysis:" : "Document analyzed successfully! Here are the insights:",
           role: "assistant",
           timestamp: new Date(),
+          isStreaming: false,
+          fullContent: isPDF ? "PDF processed successfully! Analysis:" : "Document analyzed successfully! Here are the insights:",
         };
         dispatch({ type: "ADD_MESSAGE", payload: processingMessage });
 
@@ -886,6 +1362,8 @@ export default function SimpleChatFixedPage() {
             content: formattedContent || "Analysis completed successfully.",
             role: "assistant",
             timestamp: new Date(),
+            isStreaming: false,
+            fullContent: formattedContent || "Analysis completed successfully.",
           };
           dispatch({ type: "ADD_MESSAGE", payload: analysisMessage });
         }
@@ -897,6 +1375,8 @@ export default function SimpleChatFixedPage() {
             role: "assistant",
             timestamp: new Date(),
             chartData: data.chartData,
+            isStreaming: false,
+            fullContent: "Here's a visual representation of your document:",
           };
           dispatch({ type: "ADD_MESSAGE", payload: chartMessage });
         }
@@ -924,6 +1404,8 @@ export default function SimpleChatFixedPage() {
         content: errorContent,
         role: "assistant",
         timestamp: new Date(),
+        isStreaming: false,
+        fullContent: errorContent,
       };
       dispatch({ type: "ADD_MESSAGE", payload: errorMessage });
     } finally {
@@ -1727,7 +2209,7 @@ export default function SimpleChatFixedPage() {
 
         {/* Chat Area - always fills available space, leaves room for panel if open */}
         <div className="flex flex-col w-full">{/* Chat Header - Full Width */}
-          <div className="chat-header bg-gradient-to-r from-blue-600 to-purple-600 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0 flex items-center justify-between w-full">
+          <div className="chat-header bg-gradient-to-r from-blue-600 to-purple-600 px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 flex items-center justify-between w-full">
             {/* Hamburger Menu - Left side */}
             <div className="flex-shrink-0">
               <HamburgerMenu
@@ -1741,8 +2223,8 @@ export default function SimpleChatFixedPage() {
             </div>
             
             {/* Text Content - Center */}
-            <div className="flex-1 text-center">
-              <h2 className="chat-title text-lg sm:text-xl font-semibold text-white">AI Assistant</h2>
+            <div className="flex-1 text-center px-2 sm:px-4">
+              <h2 className="chat-title text-base sm:text-lg md:text-xl font-semibold text-white">AI Assistant</h2>
               <p className="chat-subtitle text-blue-100 text-xs sm:text-sm">
                 Ask me anything about your data
                 {process.env.NODE_ENV === 'development' && (
@@ -1754,16 +2236,16 @@ export default function SimpleChatFixedPage() {
             </div>
 
             {/* New Conversation Button - Center Right */}
-            <div className="flex-shrink-0 mr-2">
+            <div className="flex-shrink-0 mr-1 sm:mr-2">
               <button
                 onClick={startNewConversation}
                 disabled={isLoading || isGeneratingReport || isLoadingEnhancedData}
                 title="Start a new conversation (creates a new thread)"
-                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-target ${
                   isLoading || isGeneratingReport || isLoadingEnhancedData ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">New Chat</span>
               </button>
             </div>
@@ -1774,11 +2256,11 @@ export default function SimpleChatFixedPage() {
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 disabled={isLoading || isGeneratingReport || isLoadingEnhancedData}
                 title="Chat settings and actions"
-                className={`flex items-center gap-1 px-3 py-2 text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-target ${
                   isLoading || isGeneratingReport || isLoadingEnhancedData ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Settings</span>
                 {isLoading || isGeneratingReport || isLoadingEnhancedData ? (
                   <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white ml-1"></div>
@@ -1788,7 +2270,7 @@ export default function SimpleChatFixedPage() {
               </button>
               
               {isSettingsOpen && !(isLoading || isGeneratingReport || isLoadingEnhancedData) && (
-                <div className="absolute right-0 mt-2 w-56 bg-background border border-border rounded-md shadow-lg z-50">
+                <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-background border border-border rounded-md shadow-lg z-50">
                   <div className="py-1">
                     <button
                       onClick={() => {
@@ -1796,10 +2278,10 @@ export default function SimpleChatFixedPage() {
                         setIsSettingsOpen(false);
                       }}
                       disabled={isGeneratingReport || isLoadingEnhancedData}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
                     >
                       <FileText className="w-4 h-4" />
-                      {isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                      <span className="text-xs sm:text-sm">{isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -1807,10 +2289,10 @@ export default function SimpleChatFixedPage() {
                         setIsSettingsOpen(false);
                       }}
                       disabled={isLoading}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
                     >
                       <Activity className="w-4 h-4" />
-                      {isLoading ? 'Refreshing...' : 'Force Refresh'}
+                      <span className="text-xs sm:text-sm">{isLoading ? 'Refreshing...' : 'Force Refresh'}</span>
                     </button>
                     <div className="border-t border-border my-1"></div>
                     <button
@@ -1818,10 +2300,10 @@ export default function SimpleChatFixedPage() {
                         clearCache();
                         setIsSettingsOpen(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700 touch-target"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Clear Cache
+                      <span className="text-xs sm:text-sm">Clear Cache</span>
                     </button>
                   </div>
                 </div>
@@ -1835,7 +2317,11 @@ export default function SimpleChatFixedPage() {
             <div className="chat-wrapper flex flex-col">
 
             {/* Messages Area */}
-            <div className="messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent pb-24 sm:pb-28 md:pb-32">
+            <div className={`messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent transition-all duration-300 ${
+              showQuickReplies && !isLoading 
+                ? 'pb-32 sm:pb-40 md:pb-44' 
+                : 'pb-24 sm:pb-28 md:pb-32'
+            }`}>
               {/* Top Reference Point */}
               <div ref={messagesTopRef} />
               {/* ...existing code for messages... */}
@@ -1865,7 +2351,7 @@ export default function SimpleChatFixedPage() {
                           <div className={`message-bubble inline-block ${message.role === "user" ? "message-bubble-user px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white max-w-lg" : "message-bubble-bot px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-slate-800 text-white border border-slate-600 max-w-4xl"}`}>
                             {message.role === "assistant" ? (
                               <div className="message-text text-xs sm:text-sm leading-relaxed text-white">
-                                {renderMessageContent(typeof message.content === 'string' ? message.content : String(message.content || ''))}
+                                <StreamingMessageContent message={message} />
                               </div>
                             ) : (
                               <div className="message-text text-xs sm:text-sm leading-relaxed text-white">
@@ -1966,9 +2452,64 @@ export default function SimpleChatFixedPage() {
             </div>
           </div>
 
-          {/* Input Area - Full Width */}
+          {/* Quick Reply Suggestions - Above Input Area */}
+          {showQuickReplies && !isLoading && (
+            <div className="quick-replies-container quick-replies-slide-in bg-slate-800/80 backdrop-blur-sm border border-slate-600 rounded-lg p-3 sm:p-4 max-w-2xl mx-auto fixed bottom-20 sm:bottom-24 left-1/2 transform -translate-x-1/2 z-40 shadow-lg">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm text-gray-300 font-medium">💬 Quick Replies</span>
+                  <span className="text-xs text-gray-500">(Select to continue the conversation)</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowQuickReplies(false)}
+                  className="text-gray-400 hover:text-white p-1 h-auto"
+                  title="Hide suggestions"
+                >
+                  <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                {quickReplySuggestions.map((suggestion, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickReply(suggestion.text)}
+                    className="flex items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs bg-slate-700/50 border-slate-600 text-white hover:bg-slate-600 hover:border-slate-500 transition-all duration-200 hover:scale-105 touch-target justify-start"
+                    title={`Click to use: "${suggestion.text}"`}
+                  >
+                    <span className="text-xs sm:text-sm flex-shrink-0">{suggestion.icon}</span>
+                    <span className="text-xs leading-tight truncate">{suggestion.text}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Input Area - Centered with Max Width */}
           <div className="input-container p-3 sm:p-4 md:p-6 border-t border-slate-600 bg-slate-800/50 flex-shrink-0 w-full fixed bottom-0 left-0 right-0 z-50">
-            <form onSubmit={handleSubmit} className="input-wrapper flex items-center space-x-2 sm:space-x-4 w-full">
+            <div className="max-w-4xl mx-auto w-full">
+              
+              {/* Quick Replies Toggle Button - Show when quick replies are hidden */}
+              {!showQuickReplies && messages.length > 0 && !isLoading && (
+                <div className="flex justify-center mb-3">
+                  <Button
+                    onClick={() => setShowQuickReplies(true)}
+                    variant="outline"
+                    size="sm"
+                    className="quick-replies-toggle flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-700/90 to-slate-600/90 border-slate-500 text-gray-200 hover:from-slate-600 hover:to-slate-500 hover:text-white transition-all duration-300 rounded-full shadow-lg hover:shadow-xl hover:scale-105 backdrop-blur-sm"
+                    title="Show quick reply suggestions"
+                  >
+                    <MessageSquareText className="w-4 h-4" />
+                    <span className="text-sm font-medium">Quick Replies</span>
+                    <ChevronUp className="w-3 h-3 opacity-75" />
+                  </Button>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="input-wrapper flex items-end space-x-2 sm:space-x-4 w-full">
                 <Input
                   type="file"
                   ref={fileInputRef}
@@ -1986,29 +2527,56 @@ export default function SimpleChatFixedPage() {
                 >
                   <Upload className={`w-4 h-4 sm:w-5 sm:h-5 ${isUploadProcessing ? 'animate-spin' : ''}`} />
                 </Button>
-                <Input
+                <Textarea
+                  ref={textareaRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message here..."
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
                   disabled={isLoading || isUploadProcessing}
-                  className="message-input flex-1 px-3 py-2 sm:px-4 sm:py-3 bg-slate-700 border border-slate-600 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                  className="message-input flex-1 px-3 py-2 sm:px-4 sm:py-3 bg-slate-700 border border-slate-600 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[44px] max-h-[120px] resize-none overflow-y-auto"
+                  rows={1}
                 />
                 <Button
-                  type="submit"
-                  disabled={isLoading || !input.trim() || isUploadProcessing}
-                  className={`send-button p-2 sm:p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl sm:rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl flex-shrink-0 ${
-                    !input.trim() ? 'loading-disabled opacity-60 cursor-not-allowed' : 'hover-glow'
+                  type={isLoading ? "button" : "submit"}
+                  onClick={isLoading ? stopGeneration : undefined}
+                  disabled={(!isLoading && !input.trim()) || isUploadProcessing}
+                  className={`send-button p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl flex-shrink-0 self-end ${
+                    isLoading 
+                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                      : !input.trim() 
+                        ? 'loading-disabled opacity-60 cursor-not-allowed bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+                        : 'hover-glow bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'
                   }`}
+                  title={isLoading ? "Stop generation" : "Send message"}
                 >
-                  <Send className={`send-icon w-4 h-4 sm:w-5 sm:h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                  {isLoading ? (
+                    <Square className="send-icon w-4 h-4 sm:w-5 sm:h-5" />
+                  ) : (
+                    <Send className="send-icon w-4 h-4 sm:w-5 sm:h-5" />
+                  )}
                 </Button>
               </form>
+              
+              {/* Keyboard shortcuts hint */}
+              <div className="mt-1 text-xs text-gray-400 text-center">
+                {isLoading ? (
+                  <span className="text-orange-300">🔴 AI is responding... Press Escape or click Stop to cancel</span>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">💡 Press Enter to send • Shift+Enter for new line</span>
+                    <span className="sm:hidden">💡 Enter = send • Shift+Enter = new line</span>
+                  </>
+                )}
+              </div>
+              
               {isUploadProcessing && uploadedFile && (
                 <div className="mt-2 text-xs sm:text-sm text-gray-200">
                   Processing {uploadedFile}...
                 </div>
               )}
             </div>
+          </div>
 
         </div>
       </div>
@@ -2016,12 +2584,16 @@ export default function SimpleChatFixedPage() {
 
       {/* Round Scroll Buttons - Far Right with updated styling */}
       {messages.length > 3 && (
-        <div className="fixed right-6 sm:right-8 bottom-20 sm:bottom-32 flex flex-col gap-2 z-50">
+        <div className={`fixed right-4 sm:right-6 md:right-8 flex flex-col gap-2 z-50 transition-all duration-300 ${
+          showQuickReplies && !isLoading 
+            ? 'bottom-32 sm:bottom-40 md:bottom-44' 
+            : 'bottom-20 sm:bottom-32'
+        }`}>
               <Button
                 onClick={scrollToTop}
                 variant="outline"
                 size="sm"
-                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110"
+                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110 touch-target"
                 title="Jump to top"
               >
                 <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -2030,7 +2602,7 @@ export default function SimpleChatFixedPage() {
                 onClick={scrollToBottom}
                 variant="outline"
                 size="sm"
-                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110"
+                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110 touch-target"
                 title="Jump to bottom"
               >
                 <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />

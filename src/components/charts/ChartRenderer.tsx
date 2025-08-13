@@ -15,19 +15,17 @@ interface ChartRendererProps {
 // Chart wrapper component to include AI insights
 function ChartWithInsights({ children, chartData }: { children: React.ReactNode; chartData: ChartData }) {
   return (
-    <div className="chart-container bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 mb-4">
-      <div className="chart-content">
+    <div className="chart-container w-full h-full">
+      <div className="chart-content w-full h-full">
         {children}
       </div>
       {(chartData as any).aiInsight && (
-        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
-          <p className="text-sm text-gray-600 dark:text-gray-300 italic">
-            {(chartData as any).aiInsight}
-          </p>
+        <div className="mt-3 p-2 bg-muted/30 rounded text-xs text-muted-foreground">
+          <span className="font-medium">💡 AI Insight:</span> {(chartData as any).aiInsight}
           {(chartData as any).sourceInfo && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <div className="text-xs opacity-75 mt-1">
               {(chartData as any).sourceInfo}
-            </p>
+            </div>
           )}
         </div>
       )}
@@ -292,14 +290,14 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         animations: {
           enabled: true,
           easing: 'easeinout',
-          speed: 400,
+          speed: 600,
           animateGradually: {
             enabled: true,
-            delay: 50
+            delay: 80
           },
           dynamicAnimation: {
             enabled: true,
-            speed: 200
+            speed: 350
           }
         },
         events: {
@@ -357,7 +355,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       tooltip: {
         theme: (isDark ? 'dark' : 'light') as 'dark' | 'light',
         style: {
-          fontSize: '12px',
+          fontSize: '13px',
           fontFamily: 'Inter, system-ui, sans-serif'
         },
         x: {
@@ -367,14 +365,24 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           formatter: function (val: number) {
             return typeof val === 'number' ? val.toLocaleString() : val
           }
-        }
+        },
+        marker: {
+          show: true,
+          fillColors: dynamicColors
+        },
+        fillSeriesColor: false
       },
       legend: {
         show: true,
         position: 'bottom' as const,
         horizontalAlign: 'center' as const,
-        fontSize: '12px',
+        fontSize: '13px',
         fontFamily: 'Inter, system-ui, sans-serif',
+        fontWeight: 500,
+        itemMargin: {
+          horizontal: 12,
+          vertical: 8
+        },
         markers: {
           size: 8,
           strokeWidth: 0,
@@ -387,7 +395,7 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
       grid: {
         show: true,
         borderColor: isDark ? '#374151' : '#e5e7eb',
-        strokeDashArray: 1,
+        strokeDashArray: 2,
         position: 'back' as const,
         xaxis: {
           lines: {
@@ -400,14 +408,27 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           }
         },
         padding: {
-          top: 10,
-          right: 10,
-          bottom: 10,
-          left: 10
+          top: 8,
+          right: 12,
+          bottom: 12,
+          left: 12
         }
       },
       stroke: {
-        width: 2
+        width: 2,
+        curve: 'smooth' as const
+      },
+      title: {
+        text: undefined, // Titles are handled by parent components
+        margin: 0
+      },
+      dataLabels: {
+        enabled: false, // Can be overridden per chart type
+        style: {
+          fontSize: '11px',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontWeight: 600
+        }
       }
     };
 
@@ -453,9 +474,14 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
         plotOptions: {
           bar: {
             distributed: true, // This enables different colors for each bar
-            borderRadius: 4,
+            borderRadius: 6,
+            columnWidth: '60%',
             dataLabels: {
               position: 'top'
+            },
+            colors: {
+              backgroundBarColors: [],
+              backgroundBarOpacity: 0
             }
           }
         },
@@ -464,37 +490,58 @@ export default function ChartRenderer({ chartData, onChartClick }: ChartRenderer
           labels: {
             style: {
               fontSize: '12px',
-              fontWeight: 'bold'
+              fontWeight: '600',
+              colors: isDark ? '#9CA3AF' : '#6B7280'
             },
             maxHeight: 120,
-            rotate: -45
+            rotate: -45,
+            rotateAlways: false,
+            hideOverlappingLabels: true
+          },
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
           }
         },
         yaxis: {
           labels: {
             style: {
-              fontSize: '12px'
+              fontSize: '12px',
+              fontWeight: '500',
+              colors: isDark ? '#9CA3AF' : '#6B7280'
+            },
+            formatter: function (val: number) {
+              return typeof val === 'number' ? val.toLocaleString() : val
             }
           }
         },
-        title: {
-          text: chartTitle,
+        dataLabels: {
+          enabled: true,
+          offsetY: -20,
           style: {
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: isDark ? '#ffffff' : '#333333'
+            fontSize: '11px',
+            fontWeight: 600,
+            colors: [isDark ? '#E5E7EB' : '#374151']
           },
-          margin: 10
+          formatter: function (val: number) {
+            return typeof val === 'number' ? val.toLocaleString() : val
+          }
+        },
+        title: {
+          text: undefined, // Title handled by parent component
+          margin: 0
         },
         legend: {
           show: false // Hide legend for distributed bars
         },
         grid: {
           padding: {
-            top: 20,
-            right: 20,
-            bottom: 20,
-            left: 20
+            top: 10,
+            right: 15,
+            bottom: 15,
+            left: 15
           }
         }
       };

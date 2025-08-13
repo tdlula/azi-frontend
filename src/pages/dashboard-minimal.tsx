@@ -778,50 +778,50 @@ Return analysis with specific transcript excerpts, quantified insights, and data
     <div className="bg-background">
       <AppHeader />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Navigation */}
-        <div className="flex justify-between items-center mb-6 sm:mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Radio Analytics Dashboard</h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center mb-4 sm:mb-6 md:mb-8">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Radio Analytics Dashboard</h1>
+            <p className="text-muted-foreground mt-1 text-sm md:text-base leading-tight">
               Real-time insights from radio transcript analysis powered by OpenAI
             </p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {/* Topic Filter Dropdown */}
             <div className="relative filter-dropdown">
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
                 title="Filter dashboard content by specific topics like Shoprite (default), Telkom, ANC, or view all general content"
-                className={`flex items-center gap-2 px-3 py-2 text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors text-foreground ${
+                className={`flex items-center gap-2 px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-md hover:bg-accent/50 transition-colors text-foreground touch-target ${
                   loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <Filter className="w-4 h-4" />
-                <span className="text-foreground font-medium">{topicsData.find(topic => topic.value === selectedTopic)?.label || "Shoprite"}</span>
+                <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-foreground font-medium text-xs sm:text-sm truncate max-w-20 sm:max-w-none">{topicsData.find(topic => topic.value === selectedTopic)?.label || "Shoprite"}</span>
                 {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-primary"></div>
                 ) : (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                 )}
               </button>
               
               {isFilterOpen && !(loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud) && (
-                <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-md shadow-lg z-50">
+                <div className="absolute right-0 sm:left-0 mt-2 w-56 sm:w-64 bg-background border border-border rounded-md shadow-lg z-50">
                   <div className="py-1">
                     {topicsData.map((topic) => (
                       <button
                         key={topic.id}
                         onClick={() => handleTopicChange(topic.value)}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors group ${
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors group touch-target ${
                           selectedTopic === topic.value ? 'bg-accent text-accent-foreground' : ''
                         }`}
                         title={topic.description}
                       >
                         <div className="flex flex-col">
                           <span className="font-medium">{topic.label}</span>
-                          <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 break-words">
                             {topic.description}
                           </span>
                         </div>
@@ -833,11 +833,13 @@ Return analysis with specific transcript excerpts, quantified insights, and data
             </div>
             
             {/* Date Range Picker */}
-            <DateRangePicker
-              selectedRange={selectedDateRange}
-              onRangeChange={handleDateRangeChange}
-              disabled={isDashboardLoading}
-            />
+            <div className="hidden sm:block">
+              <DateRangePicker
+                selectedRange={selectedDateRange}
+                onRangeChange={handleDateRangeChange}
+                disabled={isDashboardLoading}
+              />
+            </div>
             
             {/* Settings Dropdown */}
             <div className="relative settings-dropdown">
@@ -845,11 +847,11 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
                 title="Dashboard settings and actions"
-                className={`flex items-center gap-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-xs sm:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors touch-target ${
                   loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Settings</span>
                 {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? (
                   <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white ml-1"></div>
@@ -859,7 +861,7 @@ Return analysis with specific transcript excerpts, quantified insights, and data
               </button>
               
               {isSettingsOpen && !(loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud) && (
-                <div className="absolute right-0 mt-2 w-56 bg-background border border-border rounded-md shadow-lg z-50">
+                <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-background border border-border rounded-md shadow-lg z-50">
                   <div className="py-1">
                     <button
                       onClick={() => {
@@ -867,10 +869,10 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                         setIsSettingsOpen(false);
                       }}
                       disabled={isDashboardLoading || isGeneratingReport || isLoadingEnhancedData}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
                     >
                       <FileText className="w-4 h-4" />
-                      {isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                      <span className="text-xs sm:text-sm">{isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -878,10 +880,10 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                         setIsSettingsOpen(false);
                       }}
                       disabled={loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
                     >
                       <Activity className="w-4 h-4" />
-                      {loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'Updating...' : 'Force Refresh'}
+                      <span className="text-xs sm:text-sm">{loadingState.isLoadingMetrics || loadingState.isLoadingCharts || loadingState.isLoadingWordCloud ? 'Updating...' : 'Force Refresh'}</span>
                     </button>
                     <div className="border-t border-border my-1"></div>
                     <button
@@ -889,10 +891,10 @@ Return analysis with specific transcript excerpts, quantified insights, and data
                         clearCache();
                         setIsSettingsOpen(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700 touch-target"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Clear Cache
+                      <span className="text-xs sm:text-sm">Clear Cache</span>
                     </button>
                   </div>
                 </div>
