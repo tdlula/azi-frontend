@@ -12,6 +12,12 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const { isAuthenticated, isLoading, user } = useAuth();
   const [, setLocation] = useLocation();
 
+  React.useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setLocation('/login');
+    }
+  }, [isLoading, isAuthenticated, setLocation]);
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
@@ -24,9 +30,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     );
   }
 
-  // Redirect to login if not authenticated
+  // Prevent rendering protected content if not authenticated
   if (!isAuthenticated) {
-    setLocation('/login');
     return null;
   }
 

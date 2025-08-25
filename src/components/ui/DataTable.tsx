@@ -53,9 +53,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, title }) => {
           </tbody>
         </table>
       </div>
-      <div className="mt-2 text-xs text-gray-400">
-        {data.rows.length} row{data.rows.length !== 1 ? 's' : ''} × {data.headers.length} column{data.headers.length !== 1 ? 's' : ''}
-      </div>
+  {/* Removed row and column count display */}
     </div>
   );
 };

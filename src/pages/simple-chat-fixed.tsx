@@ -259,7 +259,7 @@ export default function SimpleChatFixedPage() {
           clearInterval(streamInterval);
           streamingIntervalRef.current = null;
         }
-      }, 30); // Adjust speed here (30ms = ~33 words per second for average word length)
+  }, 1); // Ultra-fast: 1ms per character
 
       streamingIntervalRef.current = streamInterval;
 
@@ -552,87 +552,60 @@ export default function SimpleChatFixedPage() {
     const fullContent = message.fullContent || message.content;
     const shouldStream = message.role === 'assistant' && !!message.isStreaming && message.id === streamingMessageId;
     const { displayText, isComplete } = useStreamingText(fullContent, message.id, shouldStream);
-    
+
     const contentToRender = shouldStream ? displayText : fullContent;
-    
+
     // Ensure we always have content to render
     if (!contentToRender) {
       return <div>Loading...</div>;
     }
-    
-    // Check for potential table content with more nuanced detection
-    // Apply formatting to the entire content first, then split for table detection
-    const formattedContent = formatTextWithDefinitions(contentToRender, aiResponseDefinitions);
-    const lines = contentToRender.split('\n');
-    const pipeLines = lines.filter(line => line.includes('|'));
-    const commaLines = lines.filter(line => line.includes(','));
-    const tabLines = lines.filter(line => line.includes('\t'));
-    
-    const mightContainTable = (
-      // Markdown table: multiple lines with pipes, at least 3 lines (header + separator + data)
-      (pipeLines.length >= 3 && pipeLines.some(line => line.split('|').length >= 4)) ||
-      // CSV: multiple lines with commas, consistent structure
-      (commaLines.length >= 3 && commaLines.some(line => line.split(',').length >= 3)) ||
-      // TSV: multiple lines with tabs
-      (tabLines.length >= 3 && tabLines.some(line => line.split('\t').length >= 3))
-    ) && (
-      // Exclude clearly conversational content
-      !contentToRender.toLowerCase().match(/^(here are|the results|i found|let me|i'll|i can|based on)/i) &&
-      contentToRender.length > 50 // Reasonable minimum length
-    );
 
-    // Only attempt table detection if content seems table-like and streaming is complete
-    if (mightContainTable && (isComplete || !shouldStream)) {
-      const tableData = detectMultipleTableFormats(contentToRender);
-      
-      if (tableData) {
-        // Extract non-table content (content before and after table)
-        const lines = contentToRender.split('\n');
-        let tableStartIndex = -1;
-        let tableEndIndex = -1;
-        
-        // Find table boundaries in the content
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line.includes('|') && line.split('|').length >= 3) {
-            if (tableStartIndex === -1) {
-              tableStartIndex = i;
-            }
-            tableEndIndex = i;
+    // Always attempt table extraction, even if surrounded by commentary
+    const tableData = detectMultipleTableFormats(contentToRender);
+    if (tableData) {
+      // Find table boundaries in the content
+      const lines = contentToRender.split('\n');
+      let tableStartIndex = -1;
+      let tableEndIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.includes('|') && line.split('|').length >= 3) {
+          if (tableStartIndex === -1) {
+            tableStartIndex = i;
           }
+          tableEndIndex = i;
         }
-        
-        const beforeTable = tableStartIndex > 0 ? lines.slice(0, tableStartIndex).join('\n').trim() : '';
-        const afterTable = tableEndIndex < lines.length - 1 ? lines.slice(tableEndIndex + 1).join('\n').trim() : '';
-        
-        return (
-          <div>
-            {beforeTable && (
-              <div className="prose prose-sm max-w-none mb-4 text-white">
-                <div 
-                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(beforeTable, aiResponseDefinitions) }}
-                  className="leading-relaxed text-white"
-                />
-              </div>
-            )}
-            <DataTable data={tableData} title={tableData.title} />
-            {afterTable && (
-              <div className="prose prose-sm max-w-none mt-4 text-white">
-                <div 
-                  dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(afterTable, aiResponseDefinitions) }}
-                  className="leading-relaxed text-white"
-                />
-              </div>
-            )}
-            {shouldStream && !isComplete && (
-              <span className="inline-block w-2 h-5 bg-white ml-1 animate-pulse"></span>
-            )}
-          </div>
-        );
       }
+      const beforeTable = tableStartIndex > 0 ? lines.slice(0, tableStartIndex).join('\n').trim() : '';
+      const afterTable = tableEndIndex < lines.length - 1 ? lines.slice(tableEndIndex + 1).join('\n').trim() : '';
+      return (
+        <div>
+          {beforeTable && (
+            <div className="prose prose-sm max-w-none mb-4 text-white">
+              <div 
+                dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(beforeTable, aiResponseDefinitions) }}
+                className="leading-relaxed text-white"
+              />
+            </div>
+          )}
+          <DataTable data={tableData} title={tableData.title} />
+          {afterTable && (
+            <div className="prose prose-sm max-w-none mt-4 text-white">
+              <div 
+                dangerouslySetInnerHTML={{ __html: formatTextWithDefinitions(afterTable, aiResponseDefinitions) }}
+                className="leading-relaxed text-white"
+              />
+            </div>
+          )}
+          {shouldStream && !isComplete && (
+            <span className="inline-block w-2 h-5 bg-white ml-1 animate-pulse"></span>
+          )}
+        </div>
+      );
     }
-    
-    // No table detected or content doesn't look table-like, render with enhanced formatting
+
+    // No table detected, render with enhanced formatting
+    const formattedContent = formatTextWithDefinitions(contentToRender, aiResponseDefinitions);
     return (
       <div className="prose prose-sm max-w-none text-white">
         <div 
@@ -936,7 +909,8 @@ export default function SimpleChatFixedPage() {
   const fetchSuggestions = async () => {
     // Fetch chart suggestions directly from backend
     try {
-      const response = await fetch('/api/chart-suggestions');
+      const { createApiUrl } = await import("@/lib/api");
+      const response = await fetch(createApiUrl('/api/chart-suggestions'));
       if (response.ok) {
         const data = await response.json();
         // Use 'suggestions' array from response
@@ -994,7 +968,8 @@ export default function SimpleChatFixedPage() {
 
       if (hasChartKeywords) {
         // Route to chart generation system
-        const chartResponse = await fetch("/api/generate-chart", {
+        const { createApiUrl } = await import("@/lib/api");
+        const chartResponse = await fetch(createApiUrl("/api/generate-chart"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1093,7 +1068,8 @@ export default function SimpleChatFixedPage() {
       if (hasSentimentKeywords && (isTableFormatRequest || isSummaryFormatRequest || isSentimentComparison)) {
         // Call sentiment API with format parameter - default to table for comparisons
         const format = (isTableFormatRequest || isSentimentComparison) ? "table" : "summary";
-        const sentimentResponse = await fetch("/api/chat/extract-sentiment", {
+        const { createApiUrl } = await import("@/lib/api");
+        const sentimentResponse = await fetch(createApiUrl("/api/chat/extract-sentiment"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1152,7 +1128,8 @@ export default function SimpleChatFixedPage() {
       abortControllerRef.current = new AbortController();
 
       // Regular chat API call with conversation history
-      const response = await fetch("/api/chat-response", {
+      const { createApiUrl } = await import("@/lib/api");
+      const response = await fetch(createApiUrl("/api/chat-response"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1308,7 +1285,8 @@ export default function SimpleChatFixedPage() {
       formData.append('document', file);
 
       const endpoint = isPDF ? '/api/upload-pdf' : '/api/upload-document';
-      const uploadResponse = await fetch(endpoint, {
+      const { createApiUrl } = await import("@/lib/api");
+      const uploadResponse = await fetch(createApiUrl(endpoint), {
         method: 'POST',
         body: formData,
       });
@@ -1536,7 +1514,8 @@ export default function SimpleChatFixedPage() {
 
   // Drill-down analysis functions
   const analyzeChartDrillDown = async (data: any, type: string, title: string) => {
-    const response = await fetch('/api/chart-drill-down', {
+    const { createApiUrl } = await import("@/lib/api");
+    const response = await fetch(createApiUrl('/api/chart-drill-down'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1557,7 +1536,8 @@ export default function SimpleChatFixedPage() {
   const analyzeMetricsDrillDown = async (data: any, type: string, title: string) => {
     console.log('🔍 analyzeMetricsDrillDown called with:', { data, type, title });
     
-    const response = await fetch('/api/metrics-drill-down', {
+    const { createApiUrl } = await import("@/lib/api");
+    const response = await fetch(createApiUrl('/api/metrics-drill-down'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2223,7 +2203,7 @@ export default function SimpleChatFixedPage() {
             </div>
             
             {/* Text Content - Center */}
-            <div className="flex-1 text-center px-2 sm:px-4">
+            {/*<div className="flex-1 text-center px-2 sm:px-4">
               <h2 className="chat-title text-base sm:text-lg md:text-xl font-semibold text-white">AI Assistant</h2>
               <p className="chat-subtitle text-blue-100 text-xs sm:text-sm">
                 Ask me anything about your data
@@ -2233,7 +2213,7 @@ export default function SimpleChatFixedPage() {
                   </span>
                 )}
               </p>
-            </div>
+            </div>*/}
 
             {/* New Conversation Button - Center Right */}
             <div className="flex-shrink-0 mr-1 sm:mr-2">
@@ -2317,11 +2297,7 @@ export default function SimpleChatFixedPage() {
             <div className="chat-wrapper flex flex-col">
 
             {/* Messages Area */}
-            <div className={`messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent transition-all duration-300 ${
-              showQuickReplies && !isLoading 
-                ? 'pb-32 sm:pb-40 md:pb-44' 
-                : 'pb-24 sm:pb-28 md:pb-32'
-            }`}>
+            <div className={`messages-container p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-transparent transition-all duration-300 pb-32 sm:pb-40 md:pb-44`}>
               {/* Top Reference Point */}
               <div ref={messagesTopRef} />
               {/* ...existing code for messages... */}
@@ -2336,11 +2312,9 @@ export default function SimpleChatFixedPage() {
                     className={`message-slide-in ${message.role === "user" ? "message-wrapper-user flex items-start space-x-2 sm:space-x-3 w-full justify-end flex-row-reverse space-x-reverse" : "message-wrapper flex items-start space-x-2 sm:space-x-3 w-full"}`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
-                    <div
-                      className={`flex flex-col w-full`}
-                    >
+                    <div className={`flex flex-col w-full`}>
                       <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className={`${message.role === "user" ? "message-avatar-user" : "message-avatar-bot"} flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${message.role === "user" ? "bg-gradient-to-r from-blue-500 to-purple-600" : "bg-gradient-to-r from-emerald-500 to-teal-600"}`}>
+                        <div className={`${message.role === "user" ? "message-avatar-user" : "message-avatar-bot"} flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${message.role === "user" ? "bg-gradient-to-r from-blue-500 to-purple-600" : "bg-gradient-to-r from-emerald-500 to-teal-600"}`}> 
                           {message.role === "user" ? (
                             <User className="avatar-icon w-3 h-3 sm:w-4 sm:h-4 text-white" />
                           ) : (
@@ -2351,6 +2325,7 @@ export default function SimpleChatFixedPage() {
                           <div className={`message-bubble inline-block ${message.role === "user" ? "message-bubble-user px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white max-w-lg" : "message-bubble-bot px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-slate-800 text-white border border-slate-600 max-w-4xl"}`}>
                             {message.role === "assistant" ? (
                               <div className="message-text text-xs sm:text-sm leading-relaxed text-white">
+                                {/* Each message gets its own StreamingMessageContent, which extracts and renders its own table */}
                                 <StreamingMessageContent message={message} />
                               </div>
                             ) : (
@@ -2359,33 +2334,17 @@ export default function SimpleChatFixedPage() {
                               </div>
                             )}
                           </div>
+                          {/* Chart rendering for this message only */}
                           {message.chartData && (
                             <div className="mt-3 sm:mt-4 w-full">
                               <div className="p-4 sm:p-6 bg-slate-900 border border-slate-600 rounded-lg">
                                 <h3 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 text-white">{message.chartData.title || 'Generated Chart'}</h3>
-                                {/* Add defensive rendering - only render if chart has valid structure */}
                                 {(message.chartData.type || message.chartData.chart_type) && message.chartData.data ? (
                                   <ChartRenderer 
                                     chartData={message.chartData} 
                                     onChartClick={handleChartClick}
                                   />
-                                ) : (
-                                  <div className="flex items-center justify-center h-24 sm:h-32 text-gray-200">
-                                    <div className="text-center">
-                                      <p className="text-xs sm:text-sm">Chart data is incomplete</p>
-                                      <p className="text-xs mt-1">
-                                        Missing: {!message.chartData.type && !message.chartData.chart_type ? 'type field' : ''} 
-                                        {!message.chartData.data ? ((!message.chartData.type && !message.chartData.chart_type) ? ' and data field' : 'data field') : ''}
-                                      </p>
-                                      <details className="mt-2 text-xs">
-                                        <summary className="cursor-pointer">Debug Info</summary>
-                                        <pre className="mt-1 text-left bg-slate-800 border border-slate-600 p-2 rounded overflow-auto max-h-24 sm:max-h-32 text-xs text-gray-200">
-                                          {JSON.stringify(message.chartData, null, 2)}
-                                        </pre>
-                                      </details>
-                                    </div>
-                                  </div>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           )}
