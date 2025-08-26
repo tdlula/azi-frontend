@@ -6,7 +6,7 @@
 // Environment types
 export type Environment = 'development' | 'production';
 
-// Available environment variable keys (without VITE_DEV_ or VITE_PROD_ prefix)
+// Available environment variable keys (no prefix required)
 export type EnvVarKey = 
   | 'BACKEND_PORT'
   | 'FRONTEND_PORT'
@@ -17,22 +17,21 @@ export type EnvVarKey =
  * Get the current environment
  */
 export const getCurrentEnvironment = (): Environment => {
-  const env = import.meta.env.VITE_ENV;
-  return env === 'production' ? 'production' : 'development';
+  return 'development'; // Environment mode is no longer used
 };
 
 /**
  * Check if we're in development mode
  */
 export const isDevelopment = (): boolean => {
-  return getCurrentEnvironment() === 'development';
+  return true;
 };
 
 /**
  * Check if we're in production mode
  */
 export const isProduction = (): boolean => {
-  return getCurrentEnvironment() === 'production';
+  return false;
 };
 
 /**
@@ -41,10 +40,8 @@ export const isProduction = (): boolean => {
  * @returns The environment-specific value or undefined if not found
  */
 export const getEnvVar = (key: EnvVarKey): string | undefined => {
-  const env = getCurrentEnvironment();
-  const prefix = env === 'development' ? 'VITE_DEV_' : 'VITE_PROD_';
-  const fullKey = `${prefix}${key}`;
-  return import.meta.env[fullKey];
+  // No prefix, just use the key directly
+  return import.meta.env[key] || import.meta.env[`VITE_${key}`];
 };
 
 /**
@@ -61,7 +58,7 @@ export const getEnvVarWithFallback = (key: EnvVarKey, fallback: string): string 
  * Get the API base URL for the current environment
  */
 export const getApiBaseUrl = (): string => {
-  return getEnvVarWithFallback('API_BASE_URL', 'http://localhost:5000');
+  return getEnvVarWithFallback('API_BASE_URL', `http://localhost:${getBackendPort()}`);
 };
 
 /**
@@ -76,7 +73,8 @@ export const getBackendServer = (): string => {
  */
 export const getBackendPort = (): number => {
   const port = getEnvVar('BACKEND_PORT');
-  return port ? parseInt(port, 10) : 5000;
+  if (!port) throw new Error('BACKEND_PORT is not set in .env');
+  return parseInt(port, 10);
 };
 
 /**
@@ -84,7 +82,8 @@ export const getBackendPort = (): number => {
  */
 export const getFrontendPort = (): number => {
   const port = getEnvVar('FRONTEND_PORT');
-  return port ? parseInt(port, 10) : 3000;
+  if (!port) throw new Error('FRONTEND_PORT is not set in .env');
+  return parseInt(port, 10);
 };
 
 /**
@@ -107,11 +106,7 @@ export const isDebugApiEnabled = (): boolean => {
  * Get all environment configuration for debugging
  */
 export const getEnvironmentConfig = () => {
-  const env = getCurrentEnvironment();
   return {
-    environment: env,
-    isDevelopment: isDevelopment(),
-    isProduction: isProduction(),
     apiBaseUrl: getApiBaseUrl(),
     backendServer: getBackendServer(),
     backendPort: getBackendPort(),
@@ -128,18 +123,13 @@ export const getEnvironmentConfig = () => {
  * Log environment configuration (for development debugging)
  */
 export const logEnvironmentConfig = () => {
-  if (isDevelopment()) {
-    console.group('🌍 Environment Configuration');
-    console.table(getEnvironmentConfig());
-    console.groupEnd();
-  }
+  console.group('🌍 Environment Configuration');
+  console.table(getEnvironmentConfig());
+  console.groupEnd();
 };
 
 // Export environment constants for convenience
 export const ENV = {
-  CURRENT: getCurrentEnvironment(),
-  IS_DEV: isDevelopment(),
-  IS_PROD: isProduction(),
   API_BASE_URL: getApiBaseUrl(),
   BACKEND_URL: getBackendUrl(),
   BACKEND_SERVER: getBackendServer(),
