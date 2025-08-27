@@ -361,7 +361,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         params.append('to_date', dateRange.to.toISOString().split('T')[0]);
       }
       
-      const url = `/api/dashboard-data${params.toString() ? '?' + params.toString() : ''}`;
+      // Get API base URL from environment variables
+      const apiBaseUrl =
+        import.meta.env.VITE_PROD_API_BASE_URL ||
+        import.meta.env.VITE_DEV_API_BASE_URL ||
+        `http://localhost:5000`;
+      const url = `${apiBaseUrl}/api/dashboard-data${params.toString() ? '?' + params.toString() : ''}`;
       const response = await fetch(url);
       if (response.ok) {
         const dashboardData = await response.json();

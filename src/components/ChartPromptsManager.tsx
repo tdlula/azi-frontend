@@ -73,7 +73,7 @@ export default function ChartPromptsManager({ onPromptSelect, showStats = true }
   // Force dashboard refresh
   const forceRefreshDashboard = async () => {
     try {
-      const response = await fetch('/api/dashboard-data?force_refresh=true');
+  const response = await fetch(`${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://localhost:5000'}/api/dashboard-data?force_refresh=true`);
       if (response.ok) {
         alert('Dashboard refreshed successfully! New charts should now be visible.');
         window.location.reload(); // Refresh page to show new data
