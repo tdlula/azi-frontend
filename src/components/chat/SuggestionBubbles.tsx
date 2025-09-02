@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, BarChart3, PieChart, LineChart, Brain, Target } from "lucide-react";
+import { useLocation } from "wouter";
 
 // Define Suggestion type locally to match usage
 interface Suggestion {
@@ -75,6 +76,8 @@ const categoryIcons: Record<Suggestion["category"], React.ComponentType<{ size?:
 };
 
 export default function SuggestionBubbles({ onSuggestionClick }: SuggestionBubblesProps) {
+  const [, navigate] = useLocation();
+
   return (
     <div className="mt-6 animate-fade-in">
       <div className="flex items-start space-x-3">
@@ -85,6 +88,29 @@ export default function SuggestionBubbles({ onSuggestionClick }: SuggestionBubbl
             <p className="text-sm font-medium text-gray-700">AI Suggestions</p>
             <Badge variant="secondary" className="text-xs">Smart Prompts</Badge>
           </div>
+          
+          {/* Advanced Report Generator Highlight */}
+          <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <Brain className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Advanced Report Generator</h3>
+                  <p className="text-sm text-gray-600">Break down complex prompts into professional reports</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => navigate("/advanced-report")}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white"
+                size="sm"
+              >
+                Create Report
+              </Button>
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {defaultSuggestions.map((suggestion) => {
               const IconComponent = categoryIcons[suggestion.category];

@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardMinimal from "@/pages/dashboard-minimal";
 import SimpleChatFixed from "@/pages/simple-chat-fixed";
+import AdvancedReportGenerator from "@/pages/advanced-report-generator";
 import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
 import NotFound from "@/pages/not-found";
@@ -51,6 +52,11 @@ function AppRoutes() {
       <Route path="/chat">
         <ProtectedRoute>
           <SimpleChatFixed />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/advanced-report">
+        <ProtectedRoute>
+          <AdvancedReportGenerator />
         </ProtectedRoute>
       </Route>
       <Route path="/settings">

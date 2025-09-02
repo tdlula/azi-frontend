@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Menu, X, Download, Share2, Palette, Sun, Moon, Camera, FileDown, Link, Copy, Activity, MessageSquare } from "lucide-react";
+import { Menu, X, Download, Share2, Palette, Sun, Moon, Camera, FileDown, Link, Copy, Activity, MessageSquare, Brain } from "lucide-react";
 import { useTheme } from "@/components/ui/theme-provider";
 import { Link as RouterLink, useLocation } from "wouter";
 import html2canvas from "html2canvas";
@@ -240,6 +240,16 @@ export default function HamburgerMenu({
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Chat
+                  </Button>
+                </RouterLink>
+                <RouterLink href="/advanced-report">
+                  <Button
+                    variant={location === '/advanced-report' ? "default" : "outline"}
+                    className="w-full justify-start transition-all duration-300 hover:scale-105 hover:shadow-md touch-target text-sm"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    Advanced Reports
                   </Button>
                 </RouterLink>
               </div>

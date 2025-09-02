@@ -44,6 +44,11 @@ import {
 import ChartRenderer from "@/components/charts/ChartRenderer";
 import SentimentTable from "@/components/SentimentTable";
 import DataTable from "@/components/ui/DataTable";
+import ChatHeader from "@/components/chat/ChatHeader";
+import MessageBubble from "@/components/chat/MessageBubble";
+import InputArea from "@/components/chat/InputArea";
+import QuickReplies from "@/components/chat/QuickReplies";
+import ScrollButtons from "@/components/chat/ScrollButtons";
 import DrillDownModal from "@/components/modals/DrillDownModal";
 import SmartHelpOverlay from "@/components/help/SmartHelpOverlay";
 import AppHeader from "@/components/AppHeader";
@@ -51,7 +56,7 @@ import HamburgerMenu from "@/components/HamburgerMenu";
 import "@/styles/chat-animations.css";
 
 import jsPDF from "jspdf";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAppContext } from "@/contexts/AppContext";
 import { detectMultipleTableFormats, hasTableData } from "@/utils/tableDetection";
 import ReportGenerator from "@/components/ReportGenerator";
@@ -65,24 +70,8 @@ import {
   applyContextualFormatting,
   AIResponseDefinitions
 } from "@/utils/aiResponseFormatter";
-
-// Generate unique IDs for messages to prevent React key warnings
-let messageIdCounter = 0;
-const generateUniqueId = () => {
-  return Date.now() + ++messageIdCounter;
-};
-
-interface Message {
-  id: number;
-  content: string;
-  role: "user" | "assistant";
-  timestamp: Date;
-  chartData?: any;
-  sentimentData?: any;
-  tableData?: any;
-  isStreaming?: boolean;
-  fullContent?: string;
-}
+import { Message } from "@/types/chat";
+import { generateUniqueId } from "@/utils/chat/chatUtils";
 
 interface Suggestion {
   title: string;
@@ -185,6 +174,7 @@ const detectChartFromResponse = (content: string) => {
 };
 
 export default function SimpleChatFixedPage() {
+  const [, navigate] = useLocation();
   // ...existing code...
   // Restore context state extraction for chat page
   const { state, dispatch, loadMessages, loadSuggestions } = useAppContext();
@@ -287,6 +277,12 @@ export default function SimpleChatFixedPage() {
 
   // Handle quick reply selection
   const handleQuickReply = (suggestion: string) => {
+    // Special handling for advanced report generator
+    if (suggestion === "Create advanced report") {
+      navigate("/advanced-report");
+      return;
+    }
+    
     setInput(suggestion);
     setShowQuickReplies(false);
     // Auto-focus textarea after selecting suggestion
@@ -638,7 +634,6 @@ export default function SimpleChatFixedPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   // Restore sidebarRef for sidebar DOM access
@@ -933,6 +928,7 @@ export default function SimpleChatFixedPage() {
       content: input,
       role: "user",
       timestamp: new Date(),
+      isStreaming: false,
     };
 
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
@@ -1389,9 +1385,7 @@ export default function SimpleChatFixedPage() {
     } finally {
       setIsUploadProcessing(false);
       setUploadedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      // File input clearing is now handled by the InputArea component
     }
   };
 
@@ -2188,108 +2182,33 @@ export default function SimpleChatFixedPage() {
         )}
 
         {/* Chat Area - always fills available space, leaves room for panel if open */}
-        <div className="flex flex-col w-full">{/* Chat Header - Full Width */}
-          <div className="chat-header bg-gradient-to-r from-blue-600 to-purple-600 px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 flex items-center justify-between w-full">
-            {/* Hamburger Menu - Left side */}
-            <div className="flex-shrink-0">
-              <HamburgerMenu
-                onScreenshot={() => console.log('Screenshot taken')}
-                onShareUrl={() => console.log('URL shared')}
-                onCopyContent={() => console.log('Content copied')}
-                onExportData={() => console.log('Data exported')}
-                onDownloadChat={downloadChatHistory}
-                onShareChat={shareChatHistory}
-              />
-            </div>
-            
-            {/* Text Content - Center */}
-            {/*<div className="flex-1 text-center px-2 sm:px-4">
-              <h2 className="chat-title text-base sm:text-lg md:text-xl font-semibold text-white">AI Assistant</h2>
-              <p className="chat-subtitle text-blue-100 text-xs sm:text-sm">
-                Ask me anything about your data
-                {process.env.NODE_ENV === 'development' && (
-                  <span className="ml-2 opacity-50 text-xs">
-                    • ID: {conversationId.split(':')[1]?.substring(0, 8)}...
-                  </span>
-                )}
-              </p>
-            </div>*/}
-
-            {/* New Conversation Button - Center Right */}
-            <div className="flex-shrink-0 mr-1 sm:mr-2">
-              <button
-                onClick={startNewConversation}
-                disabled={isLoading || isGeneratingReport || isLoadingEnhancedData}
-                title="Start a new conversation (creates a new thread)"
-                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-target ${
-                  isLoading || isGeneratingReport || isLoadingEnhancedData ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">New Chat</span>
-              </button>
-            </div>
-
-            {/* Settings Dropdown - Right side */}
-            <div className="relative settings-dropdown flex-shrink-0">
-              <button
-                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                disabled={isLoading || isGeneratingReport || isLoadingEnhancedData}
-                title="Chat settings and actions"
-                className={`flex items-center gap-1 px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-target ${
-                  isLoading || isGeneratingReport || isLoadingEnhancedData ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Settings</span>
-                {isLoading || isGeneratingReport || isLoadingEnhancedData ? (
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white ml-1"></div>
-                ) : (
-                  <ChevronDown className="w-3 h-3 ml-1" />
-                )}
-              </button>
-              
-              {isSettingsOpen && !(isLoading || isGeneratingReport || isLoadingEnhancedData) && (
-                <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-background border border-border rounded-md shadow-lg z-50">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        generateReport();
-                        setIsSettingsOpen(false);
-                      }}
-                      disabled={isGeneratingReport || isLoadingEnhancedData}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span className="text-xs sm:text-sm">{isLoadingEnhancedData ? 'Fetching AI Data...' : isGeneratingReport ? 'Generating...' : 'Generate Report'}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        forceRefresh();
-                        setIsSettingsOpen(false);
-                      }}
-                      disabled={isLoading}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 touch-target"
-                    >
-                      <Activity className="w-4 h-4" />
-                      <span className="text-xs sm:text-sm">{isLoading ? 'Refreshing...' : 'Force Refresh'}</span>
-                    </button>
-                    <div className="border-t border-border my-1"></div>
-                    <button
-                      onClick={() => {
-                        clearCache();
-                        setIsSettingsOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 text-orange-600 hover:text-orange-700 touch-target"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="text-xs sm:text-sm">Clear Cache</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="flex flex-col w-full">
+          {/* Chat Header - Using ChatHeader Component */}
+          <ChatHeader
+            conversationId={conversationId}
+            settings={{
+              isOpen: isSettingsOpen,
+              isGeneratingReport,
+              isLoadingEnhancedData
+            }}
+            isLoading={isLoading}
+            onNewConversation={startNewConversation}
+            onSettingsToggle={() => setIsSettingsOpen(!isSettingsOpen)}
+            onGenerateReport={() => {
+              generateReport();
+              setIsSettingsOpen(false);
+            }}
+            onForceRefresh={() => {
+              forceRefresh();
+              setIsSettingsOpen(false);
+            }}
+            onClearCache={() => {
+              clearCache();
+              setIsSettingsOpen(false);
+            }}
+            onDownloadChat={downloadChatHistory}
+            onShareChat={shareChatHistory}
+          />
 
           {/* Chat Container - Full Width */}
           <div className="chat-container flex-1 w-full overflow-hidden">
@@ -2307,75 +2226,16 @@ export default function SimpleChatFixedPage() {
                 </div>
               ) : (
                 messages.map((message, index) => (
-                  <div
+                  <MessageBubble
                     key={message.id}
-                    className={`message-slide-in ${message.role === "user" ? "message-wrapper-user flex items-start space-x-2 sm:space-x-3 w-full justify-end flex-row-reverse space-x-reverse" : "message-wrapper flex items-start space-x-2 sm:space-x-3 w-full"}`}
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className={`flex flex-col w-full`}>
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className={`${message.role === "user" ? "message-avatar-user" : "message-avatar-bot"} flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${message.role === "user" ? "bg-gradient-to-r from-blue-500 to-purple-600" : "bg-gradient-to-r from-emerald-500 to-teal-600"}`}> 
-                          {message.role === "user" ? (
-                            <User className="avatar-icon w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                          ) : (
-                            <Bot className="avatar-icon w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                          )}
-                        </div>
-                        <div className={`flex-1 ${message.role === "user" ? "items-end" : "items-start"}`}>
-                          <div className={`message-bubble inline-block ${message.role === "user" ? "message-bubble-user px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white max-w-lg" : "message-bubble-bot px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-slate-800 text-white border border-slate-600 max-w-4xl"}`}>
-                            {message.role === "assistant" ? (
-                              <div className="message-text text-xs sm:text-sm leading-relaxed text-white">
-                                {/* Each message gets its own StreamingMessageContent, which extracts and renders its own table */}
-                                <StreamingMessageContent message={message} />
-                              </div>
-                            ) : (
-                              <div className="message-text text-xs sm:text-sm leading-relaxed text-white">
-                                {message.content}
-                              </div>
-                            )}
-                          </div>
-                          {/* Chart rendering for this message only */}
-                          {message.chartData && (
-                            <div className="mt-3 sm:mt-4 w-full">
-                              <div className="p-4 sm:p-6 bg-slate-900 border border-slate-600 rounded-lg">
-                                <h3 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 text-white">{message.chartData.title || 'Generated Chart'}</h3>
-                                {(message.chartData.type || message.chartData.chart_type) && message.chartData.data ? (
-                                  <ChartRenderer 
-                                    chartData={message.chartData} 
-                                    onChartClick={handleChartClick}
-                                  />
-                                ) : null}
-                              </div>
-                            </div>
-                          )}
-                          {message.sentimentData && (
-                            <div className="mt-3 sm:mt-4 w-full">
-                              <div className="bg-slate-900 border border-slate-600 rounded-lg p-4">
-                                <SentimentTable data={message.sentimentData} />
-                              </div>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 mt-1 sm:mt-2">
-                            <span className="message-timestamp text-xs opacity-70">
-                              {message.timestamp.toLocaleTimeString()}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => copyMessage(message.content, message.id, e)}
-                              className="text-xs p-1 h-auto transition-all hover:scale-110 relative z-10 text-gray-400 hover:text-white"
-                            >
-                              {copiedId === message.id ? (
-                                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-400 bounce-once" />
-                              ) : (
-                                <Copy className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    message={message}
+                    index={index}
+                    streamingMessageId={streamingMessageId}
+                    copiedId={copiedId}
+                    onCopyMessage={copyMessage}
+                    onChartClick={handleChartClick}
+                    StreamingMessageContent={StreamingMessageContent}
+                  />
                 ))
               )}
               {(isLoading || isUploadProcessing) && (
@@ -2411,163 +2271,45 @@ export default function SimpleChatFixedPage() {
             </div>
           </div>
 
-          {/* Quick Reply Suggestions - Above Input Area */}
-          {showQuickReplies && !isLoading && (
-            <div className="quick-replies-container quick-replies-slide-in bg-slate-800/80 backdrop-blur-sm border border-slate-600 rounded-lg p-3 sm:p-4 max-w-2xl mx-auto fixed bottom-20 sm:bottom-24 left-1/2 transform -translate-x-1/2 z-40 shadow-lg">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm text-gray-300 font-medium">💬 Quick Replies</span>
-                  <span className="text-xs text-gray-500">(Select to continue the conversation)</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowQuickReplies(false)}
-                  className="text-gray-400 hover:text-white p-1 h-auto"
-                  title="Hide suggestions"
-                >
-                  <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                {quickReplySuggestions.map((suggestion, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleQuickReply(suggestion.text)}
-                    className="flex items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs bg-slate-700/50 border-slate-600 text-white hover:bg-slate-600 hover:border-slate-500 transition-all duration-200 hover:scale-105 touch-target justify-start"
-                    title={`Click to use: "${suggestion.text}"`}
-                  >
-                    <span className="text-xs sm:text-sm flex-shrink-0">{suggestion.icon}</span>
-                    <span className="text-xs leading-tight truncate">{suggestion.text}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Quick Reply Suggestions - Using QuickReplies Component */}
+          <QuickReplies
+            show={showQuickReplies}
+            isLoading={isLoading}
+            onClose={() => setShowQuickReplies(false)}
+            onSelect={handleQuickReply}
+          />
 
-          {/* Input Area - Centered with Max Width */}
-          <div className="input-container p-3 sm:p-4 md:p-6 border-t border-slate-600 bg-slate-800/50 flex-shrink-0 w-full fixed bottom-0 left-0 right-0 z-50">
-            <div className="max-w-4xl mx-auto w-full">
-              
-              {/* Quick Replies Toggle Button - Show when quick replies are hidden */}
-              {!showQuickReplies && messages.length > 0 && !isLoading && (
-                <div className="flex justify-center mb-3">
-                  <Button
-                    onClick={() => setShowQuickReplies(true)}
-                    variant="outline"
-                    size="sm"
-                    className="quick-replies-toggle flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-700/90 to-slate-600/90 border-slate-500 text-gray-200 hover:from-slate-600 hover:to-slate-500 hover:text-white transition-all duration-300 rounded-full shadow-lg hover:shadow-xl hover:scale-105 backdrop-blur-sm"
-                    title="Show quick reply suggestions"
-                  >
-                    <MessageSquareText className="w-4 h-4" />
-                    <span className="text-sm font-medium">Quick Replies</span>
-                    <ChevronUp className="w-3 h-3 opacity-75" />
-                  </Button>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="input-wrapper flex items-end space-x-2 sm:space-x-4 w-full">
-                <Input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".txt,.pdf,text/plain,application/pdf"
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadProcessing}
-                  className="flex-shrink-0 hover-lift p-2 sm:p-3 bg-slate-700 border border-slate-600 text-white hover:bg-slate-600 rounded-xl sm:rounded-2xl transition-all duration-200"
-                >
-                  <Upload className={`w-4 h-4 sm:w-5 sm:h-5 ${isUploadProcessing ? 'animate-spin' : ''}`} />
-                </Button>
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
-                  disabled={isLoading || isUploadProcessing}
-                  className="message-input flex-1 px-3 py-2 sm:px-4 sm:py-3 bg-slate-700 border border-slate-600 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[44px] max-h-[120px] resize-none overflow-y-auto"
-                  rows={1}
-                />
-                <Button
-                  type={isLoading ? "button" : "submit"}
-                  onClick={isLoading ? stopGeneration : undefined}
-                  disabled={(!isLoading && !input.trim()) || isUploadProcessing}
-                  className={`send-button p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl flex-shrink-0 self-end ${
-                    isLoading 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
-                      : !input.trim() 
-                        ? 'loading-disabled opacity-60 cursor-not-allowed bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
-                        : 'hover-glow bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'
-                  }`}
-                  title={isLoading ? "Stop generation" : "Send message"}
-                >
-                  {isLoading ? (
-                    <Square className="send-icon w-4 h-4 sm:w-5 sm:h-5" />
-                  ) : (
-                    <Send className="send-icon w-4 h-4 sm:w-5 sm:h-5" />
-                  )}
-                </Button>
-              </form>
-              
-              {/* Keyboard shortcuts hint */}
-              <div className="mt-1 text-xs text-gray-400 text-center">
-                {isLoading ? (
-                  <span className="text-orange-300">🔴 AI is responding... Press Escape or click Stop to cancel</span>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">💡 Press Enter to send • Shift+Enter for new line</span>
-                    <span className="sm:hidden">💡 Enter = send • Shift+Enter = new line</span>
-                  </>
-                )}
-              </div>
-              
-              {isUploadProcessing && uploadedFile && (
-                <div className="mt-2 text-xs sm:text-sm text-gray-200">
-                  Processing {uploadedFile}...
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Input Area - Using InputArea Component */}
+          <InputArea
+            input={input}
+            isLoading={isLoading}
+            fileUpload={{
+              isProcessing: isUploadProcessing,
+              fileName: uploadedFile
+            }}
+            showQuickReplies={showQuickReplies}
+            messagesLength={messages.length}
+            onInputChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onSubmit={handleSubmit}
+            onFileUpload={handleFileUpload}
+            onStopGeneration={stopGeneration}
+            onShowQuickReplies={() => setShowQuickReplies(true)}
+            textareaRef={textareaRef}
+          />
 
         </div>
       </div>
       </div>
 
-      {/* Round Scroll Buttons - Far Right with updated styling */}
-      {messages.length > 3 && (
-        <div className={`fixed right-4 sm:right-6 md:right-8 flex flex-col gap-2 z-50 transition-all duration-300 ${
-          showQuickReplies && !isLoading 
-            ? 'bottom-32 sm:bottom-40 md:bottom-44' 
-            : 'bottom-20 sm:bottom-32'
-        }`}>
-              <Button
-                onClick={scrollToTop}
-                variant="outline"
-                size="sm"
-                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110 touch-target"
-                title="Jump to top"
-              >
-                <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" />
-              </Button>
-              <Button
-                onClick={scrollToBottom}
-                variant="outline"
-                size="sm"
-                className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-blue-500 hover:border-purple-600 shadow-lg hover:shadow-xl hover-glow transition-all duration-200 hover:scale-110 touch-target"
-                title="Jump to bottom"
-              >
-                <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
-              </Button>
-            </div>
-          )}
+      {/* Round Scroll Buttons - Using ScrollButtons Component */}
+      <ScrollButtons
+        messagesLength={messages.length}
+        showQuickReplies={showQuickReplies}
+        isLoading={isLoading}
+        onScrollToTop={scrollToTop}
+        onScrollToBottom={scrollToBottom}
+      />
 
       {/* Suggestion Help Modal */}
       <Dialog open={showSuggestionHelp} onOpenChange={setShowSuggestionHelp}>
