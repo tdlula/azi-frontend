@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const clearCaches = async () => {
     try {
       // Force refresh dashboard
-  await fetch(`${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://localhost:5000'}/api/dashboard-data?force_refresh=true`);
+  await fetch(`${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://129.151.191.161:5000'}/api/dashboard-data?force_refresh=true`);
       
       // You could also add backend cache clearing endpoint
       // await fetch('/api/clear-cache', { method: 'POST' });
@@ -263,7 +263,7 @@ export default function SettingsPage() {
                 <div>
                   <h4 className="font-medium mb-2 text-sm sm:text-base">Data Sources</h4>
                   <p className="text-muted-foreground">
-                    Radio transcripts from stations including Radio 94.7 and Y FM, analyzed for 
+                    Radio transcripts from local radio stations , analyzed for 
                     sentiment, topics, brand mentions, and audience engagement patterns.
                   </p>
                 </div>

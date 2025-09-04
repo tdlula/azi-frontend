@@ -58,14 +58,14 @@ export const getEnvVarWithFallback = (key: EnvVarKey, fallback: string): string 
  * Get the API base URL for the current environment
  */
 export const getApiBaseUrl = (): string => {
-  return getEnvVarWithFallback('API_BASE_URL', `http://localhost:${getBackendPort()}`);
+  return getEnvVarWithFallback('API_BASE_URL', `http://129.151.191.161:${getBackendPort()}`);
 };
 
 /**
  * Get the backend server for the current environment
  */
 export const getBackendServer = (): string => {
-  return getEnvVarWithFallback('BACKEND_SERVER', 'localhost');
+  return getEnvVarWithFallback('BACKEND_SERVER', '129.151.191.161');
 };
 
 /**

@@ -17,8 +17,8 @@ VITE_ENV=development
 # Development variables
 VITE_DEV_BACKEND_PORT=5000
 VITE_DEV_FRONTEND_PORT=3000
-VITE_DEV_BACKEND_SERVER=localhost
-VITE_DEV_API_BASE_URL=http://localhost:5000
+VITE_DEV_BACKEND_SERVER=129.151.191.161
+VITE_DEV_API_BASE_URL=http://129.151.191.161:5000
 
 # Production variables
 VITE_PROD_BACKEND_PORT=7000
@@ -65,7 +65,7 @@ import { getEnvVar, getEnvVarWithFallback } from '@/lib/env';
 const backendPort = getEnvVar('BACKEND_PORT'); // Gets VITE_DEV_BACKEND_PORT or VITE_PROD_BACKEND_PORT
 
 // Get with fallback
-const apiUrl = getEnvVarWithFallback('API_BASE_URL', 'http://localhost:5000');
+const apiUrl = getEnvVarWithFallback('API_BASE_URL', 'http://129.151.191.161:5000');
 ```
 
 ### Using Convenience Functions

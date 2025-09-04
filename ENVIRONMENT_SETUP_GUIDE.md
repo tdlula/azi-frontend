@@ -38,10 +38,10 @@ The application uses environment-specific variables with the following naming co
 
 | Variable | Value |
 |----------|-------|
-| Backend Server | `localhost` |
+| Backend Server | `129.151.191.161` |
 | Backend Port | `5000` |
 | Frontend Port | `3000` |
-| API Base URL | `http://localhost:5000` |
+| API Base URL | `http://129.151.191.161:5000` |
 | Debug API | `true` (enabled) |
 
 ## File Structure
@@ -93,7 +93,7 @@ PROD_CORS_ORIGIN=http://129.151.191.161
 ### Backend Development Settings
 ```bash
 DEV_BACKEND_PORT=5000
-DEV_CORS_ORIGIN=http://localhost:3000
+DEV_CORS_ORIGIN=http://129.151.191.161:3000
 ```
 
 ## Troubleshooting
@@ -107,7 +107,7 @@ DEV_CORS_ORIGIN=http://localhost:3000
 2. **CORS Errors**
    - Ensure backend CORS origin matches frontend URL
    - Production: `http://129.151.191.161`
-   - Development: `http://localhost:3000`
+   - Development: `http://129.151.191.161:3000`
 
 3. **Authentication Issues**
    - Clear browser localStorage: `localStorage.clear()`

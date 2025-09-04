@@ -146,13 +146,129 @@ const renderReportContent = (content: string): JSX.Element => {
   );
 };
 
-// Function to detect and extract data patterns from text
-const detectDataPatterns = (text: string): VisualizationData => {
-  const result: VisualizationData = {
+// Function to detect and extract data patterns from text - using simple-chat-fixed approach
+const detectDataPatterns = (text: string): VisualizationData & { cleanedContent?: string } => {
+  const result: VisualizationData & { cleanedContent?: string } = {
     charts: [],
     tables: [],
-    insights: []
+    insights: [],
+    cleanedContent: text
   };
+
+  // First, try to extract JSON chart objects from the text
+  const jsonChartPattern = /(?:```json\s*)?\s*\{[\s\S]*?("chart_type"|"type")[\s\S]*?\}\s*(?:```)?/g;
+  const jsonMatches = text.match(jsonChartPattern);
+  
+  if (jsonMatches) {
+    let cleanedText = text;
+    
+    for (const jsonMatch of jsonMatches) {
+      try {
+        // Extract just the JSON part from the match (remove code block markers)
+        const jsonOnly = jsonMatch.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        const chartData = JSON.parse(jsonOnly);
+        
+        // Accept charts with either chart_type or type field
+        const chartType = chartData.chart_type || chartData.type;
+        if (chartType && chartData.data) {
+          result.charts?.push({
+            type: chartType,
+            title: chartData.title || `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
+            data: chartData.data,
+            metadata: chartData.metadata
+          });
+          
+          // Remove the entire JSON block (including code block markers) from the content
+          const escapedJsonMatch = jsonMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          cleanedText = cleanedText.replace(new RegExp(escapedJsonMatch, 'g'), '');
+          
+          // Also remove any chart title headers that might precede the JSON
+          const titlePatterns = [
+            new RegExp(`(${chartType}\\s*chart[^\\n]*\\n+)`, 'gi'),
+            new RegExp(`(${chartData.title || ''}[^\\n]*\\n+)`, 'gi'),
+            // Remove lines like "Bar Chart: Title"
+            /^[A-Za-z\s]*Chart:\s*[^\n]*\n+/gmi,
+            // Remove empty lines
+            /^\s*\n/gm
+          ];
+          
+          titlePatterns.forEach(pattern => {
+            cleanedText = cleanedText.replace(pattern, '');
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to parse JSON chart object:', error);
+      }
+    }
+    
+    // Clean up extra whitespace and empty lines
+    result.cleanedContent = cleanedText
+      .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newline
+      .replace(/^\s+|\s+$/g, '') // Trim start and end
+      .replace(/\n\s*\n\s*\n/g, '\n\n'); // Clean up scattered empty lines
+  }
+
+  // If we found JSON charts, return early - these are more accurate than pattern detection
+  if (result.charts && result.charts.length > 0) {
+    return result;
+  }
+
+  // Apply simple-chat-fixed approach: detect table data and convert to charts
+  const tableData = detectMultipleTableFormats(text);
+  
+  if (tableData && tableData.headers.length >= 2) {
+    // Convert table data to chart format using simple-chat-fixed method
+    const xAxisLabel = tableData.headers[0];
+    const yAxisLabel = tableData.headers[1];
+    
+    // Chart type detection based on content
+    let chartType = 'bar'; // default
+    const textLower = text.toLowerCase();
+    if (textLower.includes('pie chart') || textLower.includes('distribution')) chartType = 'pie';
+    else if (textLower.includes('line chart') || textLower.includes('trend') || textLower.includes('over time')) chartType = 'line';
+    else if (textLower.includes('bar chart') || textLower.includes('comparison')) chartType = 'bar';
+    
+    const chartData = {
+      type: chartType,
+      title: tableData.title || 'Data Visualization',
+      data: tableData.rows.map((row, index) => {
+        // Try to parse the second column as a number (Y-axis value)
+        let value = 0;
+        if (row[1]) {
+          // Handle various number formats (6.5, 8, 9, 65%, etc.)
+          const numStr = row[1].toString().replace(/[^\d.-]/g, '');
+          value = parseFloat(numStr) || 0;
+        }
+        
+        return {
+          name: row[0] || `Item ${index + 1}`,
+          value: value,
+          y: value, // For ApexCharts compatibility
+          category: row[2] || '',
+          description: row[3] || '',
+          originalRow: row
+        };
+      }),
+      xAxis: xAxisLabel,
+      yAxis: yAxisLabel,
+      metadata: {
+        source: 'report_response_extraction',
+        originalTable: tableData,
+        detectedType: chartType,
+        confidence: 0.8
+      }
+    };
+    
+    // Validate that we have meaningful chart data
+    const hasValidData = chartData.data.length > 0 && 
+                        chartData.data.some(item => item.value > 0);
+    
+    if (hasValidData) {
+      console.log('[Report Chart Detection] Extracted chart data:', chartData);
+      result.charts?.push(chartData);
+      return result;
+    }
+  }
 
   // Enhanced percentage pattern detection (Station A: 65%, Station B: 25%, etc.)
   const percentagePattern = /([A-Za-z\s]+):\s*(\d+(?:\.\d+)?%)/g;
@@ -161,7 +277,8 @@ const detectDataPatterns = (text: string): VisualizationData => {
   if (percentageMatches.length > 1) {
     const percentageData = percentageMatches.slice(0, 8).map(match => ({
       name: match[1].trim(),
-      value: parseFloat(match[2].replace('%', ''))
+      value: parseFloat(match[2].replace('%', '')),
+      y: parseFloat(match[2].replace('%', '')) // For ApexCharts compatibility
     }));
 
     result.charts?.push({
@@ -178,7 +295,8 @@ const detectDataPatterns = (text: string): VisualizationData => {
   if (scoreMatches.length > 1) {
     const scoreData = scoreMatches.slice(0, 6).map(match => ({
       name: match[1].trim(),
-      value: parseFloat(match[2])
+      value: parseFloat(match[2]),
+      y: parseFloat(match[2]) // For ApexCharts compatibility
     }));
 
     result.charts?.push({
@@ -195,7 +313,8 @@ const detectDataPatterns = (text: string): VisualizationData => {
   if (timeMatches.length > 2) {
     const timeData = timeMatches.map(match => ({
       name: match[1],
-      value: parseFloat(match[2].replace('%', ''))
+      value: parseFloat(match[2].replace('%', '')),
+      y: parseFloat(match[2].replace('%', '')) // For ApexCharts compatibility
     }));
 
     result.charts?.push({
@@ -205,7 +324,7 @@ const detectDataPatterns = (text: string): VisualizationData => {
     });
   }
 
-  // Station comparison pattern (KAYA FM: 85%, Metro FM: 72%, etc.)
+  // Station comparison pattern (Station A: 85%, Station B: 72%, etc.)
   const stationPattern = /([A-Z]{2,}[\s\w]*(?:FM|AM|Radio|Station)):\s*(\d+(?:\.\d+)?[%]?)/gi;
   const stationMatches = Array.from(text.matchAll(stationPattern));
   
@@ -280,27 +399,22 @@ const detectDataPatterns = (text: string): VisualizationData => {
   return result;
 };
 
-// Enhanced chart data processing
-const processChartData = (data: any[]): any => {
-  if (!data || data.length === 0) return { chartData: null, seriesData: [] };
+// Simplified chart data processing - using simple-chat-fixed approach
+const processChartData = (chartObject: any): any => {
+  if (!chartObject || !chartObject.data) return { chartData: null, seriesData: [] };
 
-  // Ensure data has proper structure for ChartRenderer
-  const processedData = data.map(item => ({
-    name: item.name || item.label || 'Unknown',
-    value: typeof item.value === 'number' ? item.value : parseFloat(item.value) || 0,
-    y: typeof item.value === 'number' ? item.value : parseFloat(item.value) || 0
-  }));
-
-  // Create chart data compatible with ChartRenderer
+  // Simple approach: pass the chart data directly to ChartRenderer
+  // ChartRenderer will handle the data format conversion internally
   const chartData = {
-    categories: processedData.map(item => item.name),
-    series: [{
-      name: 'Value',
-      data: processedData.map(item => item.value)
-    }]
+    type: chartObject.type || chartObject.chart_type,
+    title: chartObject.title,
+    data: chartObject.data,
+    metadata: chartObject.metadata,
+    xAxis: chartObject.xAxis,
+    yAxis: chartObject.yAxis
   };
 
-  return { chartData, seriesData: processedData };
+  return { chartData, seriesData: chartObject.data };
 };
 
 export default function ReportVisualization({ content, title }: ReportVisualizationProps) {
@@ -316,8 +430,12 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
   const tableData = detectMultipleTableFormats(content);
   const visualizationData = detectDataPatterns(content);
   
+  // Use cleaned content if charts were extracted from JSON
+  const contentToRender = visualizationData.cleanedContent || content;
+  
   // Debug logging (remove in production)
   console.log('ReportVisualization - Content length:', content.length);
+  console.log('ReportVisualization - Cleaned content length:', contentToRender.length);
   console.log('ReportVisualization - Detected charts:', visualizationData.charts?.length || 0);
   console.log('ReportVisualization - Detected tables:', visualizationData.tables?.length || 0);
   console.log('ReportVisualization - Chat-style table:', tableData ? 'Yes' : 'No');
@@ -325,7 +443,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
   // If we have table data, handle it like the chat system does
   if (tableData) {
     // Find table boundaries in the content
-    const lines = content.split('\n');
+    const lines = contentToRender.split('\n');
     let tableStartIndex = -1;
     let tableEndIndex = -1;
     
@@ -372,7 +490,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
             </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {visualizationData.charts.map((chart, index) => {
-                const { chartData } = processChartData(chart.data);
+                const { chartData } = processChartData(chart);
                 
                 if (!chartData) return null;
 
@@ -392,7 +510,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
                           chartData={{
                             ...chartData,
                             title: chart.title,
-                            chartType: chart.type
+                            type: chart.type
                           }}
                           onChartClick={(dataPoint, chartType, title) => {
                             console.log('Chart clicked:', { dataPoint, chartType, title });
@@ -415,7 +533,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
     <div className="space-y-6">
       {/* Formatted Content */}
       <div className="prose prose-sm max-w-none">
-        {renderReportContent(content)}
+        {renderReportContent(contentToRender)}
       </div>
 
       {/* Visualizations Section - Only show if we have charts or tables */}
@@ -442,7 +560,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
           {visualizationData.charts && visualizationData.charts.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {visualizationData.charts.map((chart, index) => {
-                const { chartData } = processChartData(chart.data);
+                const { chartData } = processChartData(chart);
                 
                 if (!chartData) return null;
 
@@ -451,13 +569,15 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
                         {chart.type === 'pie' && <PieChart className="w-4 h-4 text-purple-500" />}
+                        {chart.type === 'donut' && <PieChart className="w-4 h-4 text-purple-500" />}
                         {chart.type === 'line' && <LineChart className="w-4 h-4 text-green-500" />}
                         {chart.type === 'bar' && <BarChart3 className="w-4 h-4 text-blue-500" />}
+                        {chart.type === 'radar' && <TrendingUp className="w-4 h-4 text-orange-500" />}
                         {chart.title}
                       </CardTitle>
                       <div className="flex gap-2">
                         <Badge variant="secondary" className="text-xs">
-                          {chart.data.length} data points
+                          {Array.isArray(chart.data) ? chart.data.length : 'N/A'} data points
                         </Badge>
                         <Badge variant="outline" className="text-xs">
                           {chart.type.toUpperCase()}
@@ -470,7 +590,7 @@ export default function ReportVisualization({ content, title }: ReportVisualizat
                           chartData={{
                             ...chartData,
                             title: chart.title,
-                            chartType: chart.type
+                            type: chart.type
                           }}
                           onChartClick={(dataPoint, chartType, title) => {
                             console.log('Chart clicked:', { dataPoint, chartType, title });

@@ -2333,7 +2333,7 @@ export default function SimpleChatFixedPage() {
               </ul>
             </div>
             <div className="text-xs text-muted-foreground">
-              <strong>Example:</strong> "Show me all mentions of Nike on 94.7 during last month"
+              <strong>Example:</strong> "Show me all mentions of Nike on Radio Station during last month"
             </div>
           </div>
           <div className="flex gap-2 pt-4">

@@ -20,8 +20,8 @@ VITE_ENV=development
 # Development variables
 VITE_DEV_BACKEND_PORT=5000
 VITE_DEV_FRONTEND_PORT=3000
-VITE_DEV_BACKEND_SERVER=localhost
-VITE_DEV_API_BASE_URL=http://localhost:5000
+VITE_DEV_BACKEND_SERVER=129.151.191.161
+VITE_DEV_API_BASE_URL=http://129.151.191.161:5000
 
 # Production variables
 VITE_PROD_BACKEND_PORT=7000
@@ -44,9 +44,9 @@ Write-Host "✅ Environment configured for development" -ForegroundColor Green
 Write-Host ""
 Write-Host "📋 Development Configuration Summary:" -ForegroundColor Cyan
 Write-Host "   - Environment: development" -ForegroundColor White
-Write-Host "   - Backend Server: localhost:5000" -ForegroundColor White
+Write-Host "   - Backend Server: 129.151.191.161:5000" -ForegroundColor White
 Write-Host "   - Frontend Port: 3000" -ForegroundColor White
-Write-Host "   - API Base URL: http://localhost:5000" -ForegroundColor White
+Write-Host "   - API Base URL: http://129.151.191.161:5000" -ForegroundColor White
 Write-Host "   - Debug API: enabled" -ForegroundColor White
 Write-Host ""
 Write-Host "🚀 Ready for development!" -ForegroundColor Green

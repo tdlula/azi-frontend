@@ -47,7 +47,7 @@
 - `/settings` (Settings page)
 
 ### 🌐 **API Integration:**
-- **Backend URL**: `http://localhost:5000` (configurable via `.env`)
+- **Backend URL**: `http://129.151.191.161:5000` (configurable via `.env`)
 - **Login endpoint**: `POST /api/auth/login`
 - **User profile**: `GET /api/auth/me`
 - **Token verification**: `GET /api/auth/verify`
@@ -94,7 +94,7 @@ npm run dev
 ```
 
 ### 3. Access Application:
-- Open browser: `http://localhost:3000`
+- Open browser: `http://129.151.191.161:3000`
 - Should redirect to login page
 - Try logging in with test credentials
 
@@ -110,7 +110,7 @@ npm run dev
 
 Update `azi-frontend/.env`:
 ```env
-VITE_API_URL=http://localhost:5000
+VITE_API_URL=http://129.151.191.161:5000
 ```
 
 ## 🎯 **Next Steps:**
