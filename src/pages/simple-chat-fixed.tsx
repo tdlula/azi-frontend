@@ -766,7 +766,7 @@ export default function SimpleChatFixedPage() {
       if (showQuickReplies) {
         const timeout = setTimeout(() => {
           setShowQuickReplies(false);
-        }, 30000);
+        }, 70010);
         
         return () => clearTimeout(timeout);
       }

@@ -94,7 +94,7 @@ npm run dev
 ```
 
 ### 3. Access Application:
-- Open browser: `http://129.151.191.161:3000`
+- Open browser: `http://129.151.191.161:7001`
 - Should redirect to login page
 - Try logging in with test credentials
 

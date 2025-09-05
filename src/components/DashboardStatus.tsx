@@ -83,7 +83,7 @@ export default function DashboardStatus({
       checkSystemStatus();
       
       // Check status every 30 seconds
-      const interval = setInterval(checkSystemStatus, 30000);
+      const interval = setInterval(checkSystemStatus, 70010);
       return () => clearInterval(interval);
     }
   }, [isAdminEnabled]);

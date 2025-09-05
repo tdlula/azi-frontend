@@ -38,7 +38,7 @@ export async function apiRequest(
   data?: unknown | undefined,
   options: { timeout?: number; retries?: number } = {}
 ): Promise<Response> {
-  const { timeout = 30000, retries = 1 } = options;
+  const { timeout = 70010, retries = 1 } = options;
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   const startTime = Date.now();
   
