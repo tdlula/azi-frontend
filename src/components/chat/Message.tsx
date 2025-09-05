@@ -10,15 +10,15 @@ interface MessageProps {
 }
 
 export default function Message({ message, onChartExpand }: MessageProps) {
-  const isUser = message.role === "user";
+  const isUser = message.sender === "user";
   // Add type safety for chartData
-  const chartData = message.chartData as Record<string, any> | undefined;
+  const chartData = message.charts?.[0];
 
   return (
     <div className={`mb-4 animate-slide-up ${isUser ? "flex justify-end" : ""}`}>
       {isUser ? (
         <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-md p-4 max-w-lg">
-          <p>{message.content}</p>
+          <p>{message.text}</p>
         </div>
       ) : (
         <div className="flex items-start space-x-3">
@@ -28,7 +28,7 @@ export default function Message({ message, onChartExpand }: MessageProps) {
             </span>
           </div>
           <div className="bg-gray-100 rounded-2xl rounded-tl-md p-4 max-w-2xl">
-            <p className="text-gray-800 mb-4">{message.content}</p>
+            <p className="text-gray-800 mb-4">{message.text}</p>
 
             {/* Chart */}
             {chartData && (

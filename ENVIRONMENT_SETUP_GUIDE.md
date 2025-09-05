@@ -39,9 +39,9 @@ The application uses environment-specific variables with the following naming co
 | Variable | Value |
 |----------|-------|
 | Backend Server | `129.151.191.161` |
-| Backend Port | `5000` |
+| Backend Port | `7000` |
 | Frontend Port | `3000` |
-| API Base URL | `http://129.151.191.161:5000` |
+| API Base URL | `http://129.151.191.161:7000` |
 | Debug API | `true` (enabled) |
 
 ## File Structure
@@ -92,7 +92,7 @@ PROD_CORS_ORIGIN=http://129.151.191.161
 
 ### Backend Development Settings
 ```bash
-DEV_BACKEND_PORT=5000
+DEV_BACKEND_PORT=7000
 DEV_CORS_ORIGIN=http://129.151.191.161:3000
 ```
 

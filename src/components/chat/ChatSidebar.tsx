@@ -5,8 +5,8 @@ import type { Conversation } from "@shared/schema";
 
 interface ChatSidebarProps {
   conversations: Conversation[];
-  selectedConversationId: number;
-  onConversationSelect: (id: number) => void;
+  selectedConversationId: string;
+  onConversationSelect: (id: string) => void;
 }
 
 export default function ChatSidebar({ 

@@ -18,12 +18,17 @@ export default function WordCloudRenderer({ chartData, onWordClick }: WordCloudR
   }
 
   // Calculate font sizes based on word frequency
-  const maxValue = Math.max(...chartData.wordData.map(w => w.value));
-  const minValue = Math.min(...chartData.wordData.map(w => w.value));
+  const getNumericValue = (value: number | { value: number; label: string }): number => {
+    return typeof value === 'number' ? value : value.value;
+  };
+  
+  const maxValue = Math.max(...chartData.wordData.map(w => getNumericValue(w.value)));
+  const minValue = Math.min(...chartData.wordData.map(w => getNumericValue(w.value)));
   const fontSizeRange = { min: 14, max: 48 };
   
-  const getFontSize = (value: number) => {
-    const normalized = (value - minValue) / (maxValue - minValue);
+  const getFontSize = (value: number | { value: number; label: string }) => {
+    const numericValue = getNumericValue(value);
+    const normalized = (numericValue - minValue) / (maxValue - minValue);
     return fontSizeRange.min + (normalized * (fontSizeRange.max - fontSizeRange.min));
   };
 
@@ -62,11 +67,11 @@ export default function WordCloudRenderer({ chartData, onWordClick }: WordCloudR
             style={{
               fontSize: `${getFontSize(word.value)}px`,
               color: getWordColor(word, index),
-              fontWeight: word.value > maxValue * 0.7 ? 'bold' : 'normal',
+              fontWeight: getNumericValue(word.value) > maxValue * 0.7 ? 'bold' : 'normal',
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 0 4px rgba(0, 0, 0, 0.3)',
-              filter: `brightness(${0.95 + (word.value / maxValue) * 0.15})`
+              filter: `brightness(${0.95 + (getNumericValue(word.value) / maxValue) * 0.15})`
             }}
-            title={`${word.text}: ${word.value} occurrences${word.category ? ` (${word.category})` : ''}${word.sentiment ? ` - ${word.sentiment}` : ''}`}
+            title={`${word.text}: ${getNumericValue(word.value)} occurrences${word.category ? ` (${word.category})` : ''}${word.sentiment ? ` - ${word.sentiment}` : ''}`}
           >
             {word.text}
           </span>
@@ -81,7 +86,7 @@ export default function WordCloudRenderer({ chartData, onWordClick }: WordCloudR
               <h4 className="font-semibold">{selectedWord}</h4>
               {chartData.wordData.find(w => w.text === selectedWord) && (
                 <div className="text-sm opacity-80 mt-1">
-                  <p>Frequency: {chartData.wordData.find(w => w.text === selectedWord)?.value}</p>
+                  <p>Frequency: {getNumericValue(chartData.wordData.find(w => w.text === selectedWord)?.value!)}</p>
                   {chartData.wordData.find(w => w.text === selectedWord)?.category && (
                     <p>Category: {chartData.wordData.find(w => w.text === selectedWord)?.category}</p>
                   )}

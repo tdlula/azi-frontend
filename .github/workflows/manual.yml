@@ -64,6 +64,6 @@ jobs:
             docker rm ${{ env.CONTAINER_NAME }} || true # Remove the container, '|| true' prevents failure if not exists
 
             echo "Running new container..."
-            docker run -d --name ${{ env.CONTAINER_NAME }} -p 7001:3000 ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest # Run the new container, mapping port 80 (adjust ports as needed)
+            docker run -d --name ${{ env.CONTAINER_NAME }} -p 3000:3000 ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest # Run the new container, mapping port 80 (adjust ports as needed)
 
             echo "Deployment complete!"

@@ -13,7 +13,7 @@ export default function CacheManager() {
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
+    setTimeout(() => setMessage(null), 7000);
   };
 
   const handleClearAllCache = async () => {
@@ -84,9 +84,9 @@ export default function CacheManager() {
             <span className="font-medium">Environment Info</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>Environment: <Badge variant={envInfo.isDevelopment ? 'default' : 'secondary'}>{envInfo.environment}</Badge></div>
-            <div>Mode: <Badge variant="outline">{envInfo.mode}</Badge></div>
-            <div className="col-span-2">API Base URL: <code className="text-xs bg-background px-1 rounded">{envInfo.baseUrl || 'Proxy'}</code></div>
+            <div>Environment: <Badge variant={envInfo.viteProd ? 'secondary' : 'default'}>{envInfo.viteMode}</Badge></div>
+            <div>Mode: <Badge variant="outline">{envInfo.viteDev ? 'Development' : 'Production'}</Badge></div>
+            <div className="col-span-2">API Base URL: <code className="text-xs bg-background px-1 rounded">{envInfo.apiBaseUrl || 'Proxy'}</code></div>
           </div>
         </div>
 
@@ -155,7 +155,7 @@ export default function CacheManager() {
         {/* Instructions */}
         <div className="text-xs text-muted-foreground space-y-1">
           <p><strong>Development:</strong> Uses Vite proxy (no baseURL needed)</p>
-          <p><strong>Production:</strong> Uses {envInfo.baseUrl} for API calls</p>
+          <p><strong>Production:</strong> Uses {envInfo.apiBaseUrl} for API calls</p>
           <p>Cache clearing will affect the production backend when deployed.</p>
         </div>
       </CardContent>

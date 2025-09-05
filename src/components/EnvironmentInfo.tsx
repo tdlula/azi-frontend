@@ -21,8 +21,8 @@ export const EnvironmentInfo: React.FC = () => {
       
       {/* Using environment constants */}
       <div className="space-y-2 text-sm">
-        <p><strong>Environment:</strong> {ENV.CURRENT}</p>
-        <p><strong>Mode:</strong> {ENV.IS_DEV ? 'Development' : 'Production'}</p>
+        <p><strong>Environment:</strong> {config.viteMode}</p>
+        <p><strong>Mode:</strong> {config.viteDev ? 'Development' : 'Production'}</p>
         <p><strong>API Base URL:</strong> {ENV.API_BASE_URL}</p>
         <p><strong>Backend URL:</strong> {ENV.BACKEND_URL}</p>
         <p><strong>Backend Server:</strong> {ENV.BACKEND_SERVER}</p>
@@ -32,7 +32,7 @@ export const EnvironmentInfo: React.FC = () => {
       </div>
 
       {/* Development-only features */}
-      {ENV.IS_DEV && (
+      {config.viteDev && (
         <div className="mt-4 pt-4 border-t">
           <p className="text-sm text-gray-600 mb-2">Development Tools:</p>
           <button 

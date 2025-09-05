@@ -18,10 +18,10 @@ Write-Host "📝 Setting environment to development..." -ForegroundColor Yellow
 VITE_ENV=development
 
 # Development variables
-VITE_DEV_BACKEND_PORT=5000
+VITE_DEV_BACKEND_PORT=7000
 VITE_DEV_FRONTEND_PORT=3000
 VITE_DEV_BACKEND_SERVER=129.151.191.161
-VITE_DEV_API_BASE_URL=http://129.151.191.161:5000
+VITE_DEV_API_BASE_URL=http://129.151.191.161:7000
 
 # Production variables
 VITE_PROD_BACKEND_PORT=7000
@@ -30,7 +30,7 @@ VITE_PROD_BACKEND_SERVER=129.151.191.161
 VITE_PROD_API_BASE_URL=http://129.151.191.161:7000
 
 # Server-side only (no VITE_ prefix for vite.config.ts)
-DEV_BACKEND_PORT=5000
+DEV_BACKEND_PORT=7000
 DEV_FRONTEND_PORT=3000
 PROD_BACKEND_PORT=7000
 PROD_FRONTEND_PORT=80
@@ -44,9 +44,9 @@ Write-Host "✅ Environment configured for development" -ForegroundColor Green
 Write-Host ""
 Write-Host "📋 Development Configuration Summary:" -ForegroundColor Cyan
 Write-Host "   - Environment: development" -ForegroundColor White
-Write-Host "   - Backend Server: 129.151.191.161:5000" -ForegroundColor White
+Write-Host "   - Backend Server: 129.151.191.161:7000" -ForegroundColor White
 Write-Host "   - Frontend Port: 3000" -ForegroundColor White
-Write-Host "   - API Base URL: http://129.151.191.161:5000" -ForegroundColor White
+Write-Host "   - API Base URL: http://129.151.191.161:7000" -ForegroundColor White
 Write-Host "   - Debug API: enabled" -ForegroundColor White
 Write-Host ""
 Write-Host "🚀 Ready for development!" -ForegroundColor Green

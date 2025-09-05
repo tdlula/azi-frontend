@@ -219,7 +219,7 @@ export default function DashboardMinimal() {
           console.log('🔧 Line/radar chart validation complete:', {
             labelsCount: chart.data.labels.length,
             datasetsCount: validatedDatasets.length,
-            dataPoints: validatedDatasets.map(ds => ds.data.length)
+            dataPoints: validatedDatasets.map((ds: any) => ds.data.length)
           });
         } else if (Array.isArray(chart.data)) {
           // Convert array format to line/radar format

@@ -32,7 +32,7 @@ export const AchievementNotification: React.FC<AchievementNotificationProps> = (
       // Auto-close after 5 seconds
       const timer = setTimeout(() => {
         onClose();
-      }, 5000);
+      }, 7000);
       return () => clearTimeout(timer);
     }
   }, [isVisible, achievement, onClose]);

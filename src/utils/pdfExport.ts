@@ -198,7 +198,7 @@ export const exportToPDF = async (
       if (document.body.contains(successDiv)) {
         document.body.removeChild(successDiv);
       }
-    }, 5000);
+    }, 7000);
 
   } catch (error) {
     // Remove loading overlay if it exists
@@ -240,7 +240,7 @@ export const exportToPDF = async (
       if (document.body.contains(errorDiv)) {
         document.body.removeChild(errorDiv);
       }
-    }, 5000);
+    }, 7000);
 
     throw error;
   }

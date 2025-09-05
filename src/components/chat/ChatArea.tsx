@@ -70,12 +70,11 @@ export default function ChatArea({
           {messages.length === 0 ? (
             <Message
               message={{
-                id: 0,
-                conversationId: 0,
-                content: "👋 Hello! I'm your AI data visualization assistant. I can help you create beautiful charts, analyze data trends, and generate insights. What would you like to visualize today?",
-                role: "assistant",
-                createdAt: new Date(),
-                chartData: null,
+                id: "0",
+                conversationId: "0",
+                text: "👋 Hello! I'm your AI data visualization assistant. I can help you create beautiful charts, analyze data trends, and generate insights. What would you like to visualize today?",
+                sender: "assistant",
+                timestamp: new Date(),
               }}
               onChartExpand={onChartExpand}
             />
