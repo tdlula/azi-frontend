@@ -113,7 +113,7 @@ export const getEnvironmentConfig = () => {
     frontendPort: getFrontendPort(),
     backendUrl: getBackendUrl(),
     debugApi: isDebugApiEnabled(),
-    viteMode: import.meta.env.MODE,
+    
     viteDev: import.meta.env.DEV,
     viteProd: import.meta.env.PROD,
   };
