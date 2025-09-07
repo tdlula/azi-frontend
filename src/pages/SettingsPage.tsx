@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const clearCaches = async () => {
     try {
       // Force refresh dashboard
-  await fetch(`${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data?force_refresh=true`);
+  await fetch(`${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data?force_refresh=true`);
       
       // You could also add backend cache clearing endpoint
       // await fetch('/api/clear-cache', { method: 'POST' });

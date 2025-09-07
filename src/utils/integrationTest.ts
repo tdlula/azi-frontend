@@ -15,7 +15,7 @@ async function testFrontendBackendIntegration() {
     },
     {
       name: 'Dashboard Data',
-  url: `${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data`,
+  url: `${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data`,
       expectedFields: ['metrics', 'charts']
     },
     {
@@ -25,7 +25,7 @@ async function testFrontendBackendIntegration() {
     },
     {
       name: 'Dashboard Data (Force Refresh)',
-  url: `${import.meta.env.VITE_PROD_API_BASE_URL || import.meta.env.VITE_DEV_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data?force_refresh=true`,
+  url: `${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://129.151.191.161:7000'}/api/dashboard-data?force_refresh=true`,
       expectedFields: ['metrics', 'charts']
     }
   ];
