@@ -45,7 +45,7 @@ export const testEnvironmentHelper = () => {
 };
 
 // Auto-run in development
-if (import.meta.env.DEV) {
+//if (import.meta.env.DEV) {
   // Delay to ensure all modules are loaded
-  setTimeout(testEnvironmentHelper, 1000);
-}
+  //setTimeout(testEnvironmentHelper, 1000);
+//}

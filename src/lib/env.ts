@@ -114,7 +114,7 @@ export const getEnvironmentConfig = () => {
     backendUrl: getBackendUrl(),
     debugApi: isDebugApiEnabled(),
     
-    viteDev: import.meta.env.DEV,
+    //viteDev: import.meta.env.DEV,
     viteProd: import.meta.env.PROD,
   };
 };

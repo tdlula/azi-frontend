@@ -84,8 +84,6 @@ export default function CacheManager() {
             <span className="font-medium">Environment Info</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>Environment: <Badge variant={envInfo.viteProd ? 'secondary' : 'default'}>{envInfo.viteMode}</Badge></div>
-            <div>Mode: <Badge variant="outline">{envInfo.viteDev ? 'Development' : 'Production'}</Badge></div>
             <div className="col-span-2">API Base URL: <code className="text-xs bg-background px-1 rounded">{envInfo.apiBaseUrl || 'Proxy'}</code></div>
           </div>
         </div>
